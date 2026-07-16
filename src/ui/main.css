@@ -174,11 +174,136 @@ p {
 .stats article,
 .notice,
 .snapshot-export,
-.folder-browser {
+.folder-browser,
+.duplicate-detector {
   border: 1px solid #d7e0d8;
   border-radius: 16px;
   background: rgb(255 255 255 / 82%);
   box-shadow: 0 12px 32px rgb(29 64 42 / 8%);
+}
+
+.duplicate-detector {
+  max-width: 1100px;
+  margin: 28px 0;
+  overflow: hidden;
+}
+
+.duplicate-detector__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid #e1e8e2;
+  padding: 20px;
+}
+
+.duplicate-detector__header p {
+  margin: 4px 0 0;
+}
+
+.duplicate-detector__summary {
+  flex: none;
+  border-radius: 999px;
+  background: #edf3ed;
+  color: #245b37;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 12px;
+}
+
+.duplicate-detector__empty {
+  color: #66736c;
+  padding: 28px 20px;
+  text-align: center;
+}
+
+.duplicate-groups {
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+}
+
+.duplicate-group {
+  border: 1px solid #dce5dd;
+  border-radius: 13px;
+  padding: 16px;
+}
+
+.duplicate-group > header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.duplicate-group__badge {
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 8px;
+}
+
+.duplicate-group__badge--exact {
+  background: #f9e7d5;
+  color: #854d1c;
+}
+
+.duplicate-group__badge--normalized {
+  background: #e2edf8;
+  color: #2e5c86;
+}
+
+.duplicate-group code {
+  display: block;
+  overflow: hidden;
+  margin: 10px 0;
+  color: #52655a;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.duplicate-group ul {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.duplicate-group li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 0.6fr);
+  gap: 14px;
+  border-top: 1px solid #edf1ed;
+  padding-top: 8px;
+}
+
+.duplicate-group a,
+.duplicate-group li span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.duplicate-group a {
+  color: #245b37;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.duplicate-group a:hover,
+.duplicate-group a:focus-visible {
+  text-decoration: underline;
+}
+
+.duplicate-group li span,
+.duplicate-detector__limit {
+  color: #718078;
+  font-size: 12px;
+}
+
+.duplicate-detector__limit {
+  padding: 0 20px 20px;
 }
 
 .folder-browser {
@@ -421,6 +546,20 @@ p {
 }
 
 @media (max-width: 720px) {
+  .duplicate-detector__header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .duplicate-detector__summary {
+    width: fit-content;
+  }
+
+  .duplicate-group li {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+
   .folder-browser__layout {
     grid-template-columns: 1fr;
   }

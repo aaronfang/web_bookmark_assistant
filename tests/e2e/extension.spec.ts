@@ -102,6 +102,29 @@ test('loads fixture bookmarks in an isolated Chrome profile', async () => {
       folderNavigation.getByRole('button', { name: /^Live folder tree 0$/ }),
     ).toHaveCount(0);
 
+    const duplicateId = await serviceWorker.evaluate(async () => {
+      const [fixtureFolder] = await chrome.bookmarks.search({
+        title: 'Phase 0 fixture',
+      });
+      const duplicate = await chrome.bookmarks.create({
+        parentId: fixtureFolder?.id ?? '1',
+        title: 'Tracked Example Duplicate',
+        url: 'https://example.com/?utm_source=e2e#section',
+      });
+      return duplicate.id;
+    });
+    const duplicateDetector = page.locator('.duplicate-detector');
+    await expect(
+      duplicateDetector.getByText('1 组 · 1 条可选副本'),
+    ).toBeVisible();
+    await expect(duplicateDetector.getByText('规范化相同')).toBeVisible();
+    await expect(duplicateDetector.getByText('2 个书签')).toBeVisible();
+
+    await serviceWorker.evaluate(async (bookmarkId) => {
+      await chrome.bookmarks.remove(bookmarkId);
+    }, duplicateId);
+    await expect(duplicateDetector.getByText('没有发现重复书签')).toBeVisible();
+
     await page.goto(`chrome-extension://${extensionId}/sidepanel.html`);
     await page.getByRole('searchbox', { name: '搜索书签' }).fill('MDN');
     await expect(page.getByRole('link', { name: /MDN/ })).toBeVisible();

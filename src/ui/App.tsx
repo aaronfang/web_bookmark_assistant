@@ -7,6 +7,7 @@ import { countIndependentBookmarks } from '../repositories/local-bookmark-reposi
 import { invalidateBookmarkSearchIndex } from '../search/bookmark-search';
 import { BookmarkFolderBrowser } from './BookmarkFolderBrowser';
 import { BookmarkSearch } from './BookmarkSearch';
+import { DuplicateBookmarkDetector } from './DuplicateBookmarkDetector';
 import { SnapshotExport } from './SnapshotExport';
 
 type Surface = 'popup' | 'sidepanel' | 'newtab' | 'options';
@@ -108,6 +109,7 @@ export function App({ surface }: AppProps) {
       {surface === 'options' && stats ? (
         <>
           <BookmarkFolderBrowser revision={bookmarkRevision} />
+          <DuplicateBookmarkDetector revision={bookmarkRevision} />
           <SnapshotExport />
         </>
       ) : null}
