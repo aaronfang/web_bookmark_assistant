@@ -220,6 +220,20 @@ test('loads fixture bookmarks in an isolated Chrome profile', async () => {
     await expect(
       moveSuggestions.getByText('Bookmarks Bar / Docs Majority'),
     ).toBeVisible();
+    await moveSuggestions
+      .getByRole('checkbox', { name: '选择 Docs Outlier' })
+      .check();
+    await moveSuggestions
+      .getByRole('button', { name: '预览所选建议（1）' })
+      .click();
+    const movePreview = moveSuggestions.locator('.move-batch-preview');
+    await expect(
+      movePreview.getByRole('heading', { name: '批量移动预览' }),
+    ).toBeVisible();
+    await expect(movePreview.getByText('正式开放执行前')).toBeVisible();
+    await expect(
+      movePreview.getByRole('button', { name: '执行移动（尚未开放）' }),
+    ).toBeDisabled();
 
     await serviceWorker.evaluate(async ({ sourceFolderId, targetFolderId }) => {
       await chrome.bookmarks.removeTree(sourceFolderId);
@@ -228,6 +242,7 @@ test('loads fixture bookmarks in an isolated Chrome profile', async () => {
     await expect(
       moveSuggestions.getByText('暂无高置信度移动建议'),
     ).toBeVisible();
+    await expect(movePreview).toHaveCount(0);
 
     await page.goto(`chrome-extension://${extensionId}/sidepanel.html`);
     await page.getByRole('searchbox', { name: '搜索书签' }).fill('MDN');

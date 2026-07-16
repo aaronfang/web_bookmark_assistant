@@ -18,6 +18,44 @@ export interface FolderMoveSuggestion {
   explanation: string;
 }
 
+export interface FolderMoveBatchPreview {
+  suggestions: FolderMoveSuggestion[];
+  bookmarkCount: number;
+  sourceFolders: string[];
+  targetFolders: string[];
+  snapshotRequired: true;
+  executionAvailable: false;
+}
+
+function displayFolderKey(path: readonly string[]): string {
+  return path.join(' / ') || '未分类';
+}
+
+export function buildFolderMoveBatchPreview(
+  suggestions: readonly FolderMoveSuggestion[],
+): FolderMoveBatchPreview {
+  return {
+    suggestions: [...suggestions],
+    bookmarkCount: suggestions.length,
+    sourceFolders: [
+      ...new Set(
+        suggestions.map((suggestion) =>
+          displayFolderKey(suggestion.currentFolderPath),
+        ),
+      ),
+    ].sort((left, right) => left.localeCompare(right, 'zh-CN')),
+    targetFolders: [
+      ...new Set(
+        suggestions.map((suggestion) =>
+          displayFolderKey(suggestion.targetFolderPath),
+        ),
+      ),
+    ].sort((left, right) => left.localeCompare(right, 'zh-CN')),
+    snapshotRequired: true,
+    executionAvailable: false,
+  };
+}
+
 function comparisonHostname(url: string): string | null {
   try {
     const hostname = new URL(url).hostname

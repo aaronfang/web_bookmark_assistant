@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import type { BookmarkRecord } from '../domain/bookmark';
-import { generateFolderMoveSuggestions } from './folder-move-suggestions';
+import {
+  buildFolderMoveBatchPreview,
+  generateFolderMoveSuggestions,
+} from './folder-move-suggestions';
 
 function bookmark(
   id: string,
@@ -65,5 +68,23 @@ describe('generateFolderMoveSuggestions', () => {
         bookmark('4', '20', 'Two', 'https://example.com/three'),
       ]),
     ).toEqual([]);
+  });
+
+  it('builds a non-executable batch preview with unique folders', () => {
+    const suggestions = generateFolderMoveSuggestions([
+      bookmark('1', '10', 'Documentation', 'https://docs.example.com/one'),
+      bookmark('2', '10', 'Documentation', 'https://docs.example.com/two'),
+      bookmark('3', '10', 'Documentation', 'https://docs.example.com/three'),
+      bookmark('4', '20', 'Inbox', 'https://docs.example.com/four'),
+    ]);
+    const preview = buildFolderMoveBatchPreview(suggestions);
+
+    expect(preview).toMatchObject({
+      bookmarkCount: 1,
+      sourceFolders: ['Bookmarks bar / Inbox'],
+      targetFolders: ['Bookmarks bar / Documentation'],
+      snapshotRequired: true,
+      executionAvailable: false,
+    });
   });
 });
