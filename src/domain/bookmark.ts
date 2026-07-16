@@ -8,6 +8,7 @@ export interface BookmarkRecord {
   source: BookmarkSource;
   sourceId?: string;
   parentId?: string;
+  index?: number;
   title: string;
   url: string;
   folderPath: string[];
@@ -51,10 +52,29 @@ export interface BookmarkSuggestion {
 
 export interface BookmarkOperation {
   id: string;
+  batchId: string;
   kind: 'create' | 'update' | 'move' | 'archive' | 'delete';
+  status: 'pending' | 'applied' | 'reverted' | 'failed';
   bookmarkId: string;
   createdAt: string;
   before?: string;
   after?: string;
   revertedAt?: string;
+  error?: string;
+}
+
+export type BookmarkOperationBatchStatus =
+  'planned' | 'executing' | 'completed' | 'failed' | 'reverting' | 'reverted';
+
+export interface BookmarkOperationBatch {
+  id: string;
+  kind: 'move';
+  status: BookmarkOperationBatchStatus;
+  snapshotId: string;
+  operationCount: number;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+  revertedAt?: string;
+  error?: string;
 }

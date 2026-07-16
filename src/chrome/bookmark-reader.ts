@@ -23,6 +23,7 @@ export function toChromeBookmarkRecord(
     source: 'chrome',
     sourceId: node.id,
     ...(node.parentId === undefined ? {} : { parentId: node.parentId }),
+    ...(node.index === undefined ? {} : { index: node.index }),
     title: node.title,
     url: node.url,
     folderPath: [...folderPath],
