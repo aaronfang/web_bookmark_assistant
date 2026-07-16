@@ -32,6 +32,7 @@ export function BookmarkHealthCheck({ revision }: BookmarkHealthCheckProps) {
   const [error, setError] = useState<string | null>(null);
   const [linkResults, setLinkResults] = useState<LinkHealthResult[]>([]);
   const [checkingLinks, setCheckingLinks] = useState(false);
+  const [linkFilter, setLinkFilter] = useState<'all' | 'issues'>('all');
 
   const runLinkCheck = async (): Promise<void> => {
     setCheckingLinks(true);
@@ -165,13 +166,40 @@ export function BookmarkHealthCheck({ revision }: BookmarkHealthCheckProps) {
 
       {linkResults.length > 0 ? (
         <div className="health-check__links" aria-live="polite">
-          <strong>链接检查结果：{linkResults.length} 条</strong>
-          {linkResults.map((result) => (
-            <p key={result.bookmarkId}>
-              {result.status === 'healthy' ? '✓' : '⚠'} {result.url}：
-              {result.message}
-            </p>
-          ))}
+          <strong>
+            链接检查结果：{linkResults.length} 条，
+            {
+              linkResults.filter((item) => item.status === 'healthy').length
+            }{' '}
+            条可访问
+          </strong>
+          <div className="health-check__filters" aria-label="链接结果筛选">
+            <button
+              type="button"
+              aria-pressed={linkFilter === 'all'}
+              onClick={() => setLinkFilter('all')}
+            >
+              全部
+            </button>
+            <button
+              type="button"
+              aria-pressed={linkFilter === 'issues'}
+              onClick={() => setLinkFilter('issues')}
+            >
+              仅异常
+            </button>
+          </div>
+          {linkResults
+            .filter(
+              (result) => linkFilter === 'all' || result.status !== 'healthy',
+            )
+            .map((result) => (
+              <p key={result.bookmarkId}>
+                {result.status === 'healthy' ? '✓' : '⚠'} {result.url}：
+                {result.message}（{new Date(result.checkedAt).toLocaleString()}
+                ）
+              </p>
+            ))}
         </div>
       ) : null}
 

@@ -31,32 +31,44 @@ async function synchronize(): Promise<ChromeBookmarkSummary> {
   const summary = summarizeBookmarkTree(tree);
   const incoming = flattenChromeBookmarkTree(tree);
 
-  await database.transaction('rw', database.bookmarks, async () => {
-    const existing = await database.bookmarks
-      .where('source')
-      .equals('chrome')
-      .toArray();
-    const existingBySourceId = new Map(
-      existing.map((bookmark) => [bookmark.sourceId, bookmark]),
-    );
-    const merged: BookmarkRecord[] = incoming.map((bookmark) => {
-      const previous = existingBySourceId.get(bookmark.sourceId);
+  await database.transaction(
+    'rw',
+    database.bookmarks,
+    database.linkHealth,
+    async () => {
+      const existing = await database.bookmarks
+        .where('source')
+        .equals('chrome')
+        .toArray();
+      const existingBySourceId = new Map(
+        existing.map((bookmark) => [bookmark.sourceId, bookmark]),
+      );
+      const merged: BookmarkRecord[] = incoming.map((bookmark) => {
+        const previous = existingBySourceId.get(bookmark.sourceId);
 
-      if (!previous) {
-        return bookmark;
-      }
+        if (!previous) {
+          return bookmark;
+        }
 
-      return {
-        ...bookmark,
-        tags: previous.tags,
-        note: previous.note,
-        readingStatus: previous.readingStatus,
-      };
-    });
+        return {
+          ...bookmark,
+          tags: previous.tags,
+          note: previous.note,
+          readingStatus: previous.readingStatus,
+        };
+      });
 
-    await database.bookmarks.where('source').equals('chrome').delete();
-    await database.bookmarks.bulkPut(merged);
-  });
+      await database.bookmarks.where('source').equals('chrome').delete();
+      await database.bookmarks.bulkPut(merged);
+      const validIds = new Set(merged.map((bookmark) => bookmark.id));
+      const cachedHealth = await database.linkHealth.toArray();
+      await database.linkHealth.bulkDelete(
+        cachedHealth
+          .filter((record) => !validIds.has(record.bookmarkId))
+          .map((record) => record.bookmarkId),
+      );
+    },
+  );
 
   return summary;
 }
@@ -107,7 +119,14 @@ export async function refreshChromeBookmarkMirror(id: string): Promise<void> {
 export async function removeChromeBookmarkMirrors(
   sourceIds: readonly string[],
 ): Promise<void> {
-  await database.bookmarks.bulkDelete(
-    sourceIds.map((sourceId) => `chrome:${sourceId}`),
+  const ids = sourceIds.map((sourceId) => `chrome:${sourceId}`);
+  await database.transaction(
+    'rw',
+    database.bookmarks,
+    database.linkHealth,
+    async () => {
+      await database.bookmarks.bulkDelete(ids);
+      await database.linkHealth.bulkDelete(ids);
+    },
   );
 }

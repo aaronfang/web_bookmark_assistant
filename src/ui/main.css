@@ -686,6 +686,17 @@ p {
   font-size: 12px;
 }
 
+.health-check__links {
+  margin-top: 1rem;
+  border-top: 1px solid #d5ddd5;
+  padding-top: 0.85rem;
+}
+
+.health-check__links p {
+  margin: 0.45rem 0;
+  overflow-wrap: anywhere;
+}
+
 .health-check__limit {
   padding: 0 20px 20px;
 }
