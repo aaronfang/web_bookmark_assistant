@@ -6,6 +6,7 @@ import { synchronizeChromeBookmarkMirror } from '../repositories/chrome-bookmark
 import { countIndependentBookmarks } from '../repositories/local-bookmark-repository';
 import { invalidateBookmarkSearchIndex } from '../search/bookmark-search';
 import { BookmarkFolderBrowser } from './BookmarkFolderBrowser';
+import { BookmarkHealthCheck } from './BookmarkHealthCheck';
 import { BookmarkSearch } from './BookmarkSearch';
 import { DuplicateBookmarkDetector } from './DuplicateBookmarkDetector';
 import { SnapshotExport } from './SnapshotExport';
@@ -110,6 +111,7 @@ export function App({ surface }: AppProps) {
         <>
           <BookmarkFolderBrowser revision={bookmarkRevision} />
           <DuplicateBookmarkDetector revision={bookmarkRevision} />
+          <BookmarkHealthCheck revision={bookmarkRevision} />
           <SnapshotExport />
         </>
       ) : null}

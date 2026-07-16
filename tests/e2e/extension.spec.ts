@@ -125,6 +125,48 @@ test('loads fixture bookmarks in an isolated Chrome profile', async () => {
     }, duplicateId);
     await expect(duplicateDetector.getByText('没有发现重复书签')).toBeVisible();
 
+    const healthFixtures = await serviceWorker.evaluate(async () => {
+      const [fixtureFolder] = await chrome.bookmarks.search({
+        title: 'Phase 0 fixture',
+      });
+      const emptyFolder = await chrome.bookmarks.create({
+        parentId: fixtureFolder?.id ?? '1',
+        title: 'Health Empty Folder',
+      });
+      const untitledBookmark = await chrome.bookmarks.create({
+        parentId: fixtureFolder?.id ?? '1',
+        title: 'Untitled',
+        url: 'https://example.com/health-title',
+      });
+      return {
+        emptyFolderId: emptyFolder.id,
+        untitledBookmarkId: untitledBookmark.id,
+      };
+    });
+    const healthCheck = page.locator('.health-check');
+    await expect(healthCheck.getByText('2 条候选')).toBeVisible();
+    await expect(
+      healthCheck.getByText('Health Empty Folder', { exact: true }),
+    ).toBeVisible();
+    await expect(
+      healthCheck.getByRole('link', { name: 'Untitled' }),
+    ).toBeVisible();
+    await expect(
+      healthCheck.getByRole('button', { name: '空文件夹 1' }),
+    ).toBeVisible();
+    await expect(
+      healthCheck.getByRole('button', { name: '标题待完善 1' }),
+    ).toBeVisible();
+
+    await serviceWorker.evaluate(
+      async ({ emptyFolderId, untitledBookmarkId }) => {
+        await chrome.bookmarks.remove(untitledBookmarkId);
+        await chrome.bookmarks.remove(emptyFolderId);
+      },
+      healthFixtures,
+    );
+    await expect(healthCheck.getByText('0 条候选')).toBeVisible();
+
     await page.goto(`chrome-extension://${extensionId}/sidepanel.html`);
     await page.getByRole('searchbox', { name: '搜索书签' }).fill('MDN');
     await expect(page.getByRole('link', { name: /MDN/ })).toBeVisible();

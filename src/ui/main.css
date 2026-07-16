@@ -175,11 +175,151 @@ p {
 .notice,
 .snapshot-export,
 .folder-browser,
-.duplicate-detector {
+.duplicate-detector,
+.health-check {
   border: 1px solid #d7e0d8;
   border-radius: 16px;
   background: rgb(255 255 255 / 82%);
   box-shadow: 0 12px 32px rgb(29 64 42 / 8%);
+}
+
+.health-check {
+  max-width: 1100px;
+  margin: 28px 0;
+  overflow: hidden;
+}
+
+.health-check__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid #e1e8e2;
+  padding: 20px;
+}
+
+.health-check__header p {
+  margin: 4px 0 0;
+}
+
+.health-check__summary {
+  flex: none;
+  border-radius: 999px;
+  background: #f4eee2;
+  color: #75501f;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 12px;
+}
+
+.health-check__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-bottom: 1px solid #edf1ed;
+  padding: 14px 20px;
+}
+
+.health-check__filters button {
+  border: 1px solid #d1dbd3;
+  border-radius: 999px;
+  background: #fff;
+  color: #52655a;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  padding: 7px 10px;
+}
+
+.health-check__filters button.is-selected {
+  border-color: #76a384;
+  background: #dcebdd;
+  color: #194529;
+  font-weight: 700;
+}
+
+.health-check__filters button span {
+  margin-left: 3px;
+  color: #718078;
+}
+
+.health-check__empty {
+  color: #66736c;
+  padding: 28px 20px;
+  text-align: center;
+}
+
+.health-issues {
+  display: grid;
+  gap: 8px;
+  padding: 20px;
+}
+
+.health-issue {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(140px, 0.55fr);
+  align-items: center;
+  gap: 18px;
+  border: 1px solid #dce5dd;
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.health-issue__body {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 5px 10px;
+  min-width: 0;
+}
+
+.health-issue__kind {
+  border-radius: 999px;
+  background: #f4eee2;
+  color: #75501f;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 4px 7px;
+}
+
+.health-issue--old-bookmark .health-issue__kind {
+  background: #e8eef3;
+  color: #456276;
+}
+
+.health-issue__body a,
+.health-issue__body strong,
+.health-issue__path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.health-issue__body a {
+  color: #245b37;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.health-issue__body a:hover,
+.health-issue__body a:focus-visible {
+  text-decoration: underline;
+}
+
+.health-issue__body p {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 12px;
+}
+
+.health-issue__path,
+.health-check__limit {
+  color: #718078;
+  font-size: 12px;
+}
+
+.health-check__limit {
+  padding: 0 20px 20px;
 }
 
 .duplicate-detector {
@@ -546,6 +686,20 @@ p {
 }
 
 @media (max-width: 720px) {
+  .health-check__header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .health-check__summary {
+    width: fit-content;
+  }
+
+  .health-issue {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+
   .duplicate-detector__header {
     align-items: stretch;
     flex-direction: column;
