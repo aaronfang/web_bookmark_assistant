@@ -10,18 +10,19 @@
   "scripts": {
     "env:check": "node scripts/check-environment.mjs",
     "dev": "wxt",
-    "build": "wxt build",
+    "build": "wxt build && node scripts/check-production-artifacts.mjs",
+    "build:e2e": "WBA_E2E_HARNESS=1 wxt build",
     "zip": "wxt zip",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:performance": "vitest run src/search/bookmark-search.performance.test.ts",
-    "test:e2e": "npm run build && playwright test",
+    "test:e2e": "npm run build:e2e && WBA_E2E_HARNESS=1 playwright test",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "npm run typecheck && npm run lint && npm run test && npm run build",
-    "check:all": "npm run check && playwright test",
+    "check:all": "npm run check && npm run test:e2e",
     "postinstall": "wxt prepare"
   },
   "dependencies": {

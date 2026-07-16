@@ -5,7 +5,11 @@ import { join, resolve } from 'node:path';
 import { chromium, expect, test } from '@playwright/test';
 
 test('loads fixture bookmarks in an isolated Chrome profile', async () => {
-  const extensionPath = resolve('.output/chrome-mv3');
+  const extensionPath = resolve(
+    process.env.WBA_E2E_HARNESS === '1'
+      ? '.output-e2e/chrome-mv3'
+      : '.output/chrome-mv3',
+  );
   const profilePath = await mkdtemp(join(tmpdir(), 'bookmark-assistant-e2e-'));
   const context = await chromium.launchPersistentContext(profilePath, {
     acceptDownloads: true,
@@ -199,7 +203,7 @@ test('loads fixture bookmarks in an isolated Chrome profile', async () => {
           url: `https://organize.example.test/docs/${index}`,
         });
       }
-      await chrome.bookmarks.create({
+      const outlier = await chrome.bookmarks.create({
         parentId: sourceFolder.id,
         title: 'Docs Outlier',
         url: 'https://organize.example.test/docs/outlier',
@@ -207,6 +211,7 @@ test('loads fixture bookmarks in an isolated Chrome profile', async () => {
       return {
         sourceFolderId: sourceFolder.id,
         targetFolderId: targetFolder.id,
+        outlierId: outlier.id,
       };
     });
     const moveSuggestions = page.locator('.move-suggestions');
@@ -230,10 +235,32 @@ test('loads fixture bookmarks in an isolated Chrome profile', async () => {
     await expect(
       movePreview.getByRole('heading', { name: '批量移动预览' }),
     ).toBeVisible();
-    await expect(movePreview.getByText('正式开放执行前')).toBeVisible();
     await expect(
-      movePreview.getByRole('button', { name: '执行移动（尚未开放）' }),
-    ).toBeDisabled();
+      movePreview.getByText('执行会先下载并保存 JSON 快照'),
+    ).toBeVisible();
+    await expect(
+      movePreview.getByRole('button', { name: '创建快照并执行移动' }),
+    ).toBeEnabled();
+
+    const executionDownload = page.waitForEvent('download');
+    await movePreview
+      .getByRole('button', { name: '创建快照并执行移动' })
+      .click();
+    const executionSnapshot = await executionDownload;
+    expect(executionSnapshot.suggestedFilename()).toMatch(
+      /^web-bookmark-assistant-.+\.json$/,
+    );
+    await expect(
+      moveSuggestions.getByText('已完成 1 条书签移动'),
+    ).toBeVisible();
+    const executedLocation = await serviceWorker.evaluate(
+      async (bookmarkId) => {
+        const [node] = await chrome.bookmarks.get(bookmarkId);
+        return node?.parentId;
+      },
+      suggestionFolders.outlierId,
+    );
+    expect(executedLocation).toBe(suggestionFolders.targetFolderId);
 
     await serviceWorker.evaluate(async ({ sourceFolderId, targetFolderId }) => {
       await chrome.bookmarks.removeTree(sourceFolderId);

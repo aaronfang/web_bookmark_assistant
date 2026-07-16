@@ -68,6 +68,7 @@ describe('move operation plans', () => {
       kind: 'move',
       status: 'pending',
       bookmarkId: 'chrome:4',
+      sourceId: '4',
       before: JSON.stringify({ parentId: '20', index: 7 }),
       after: JSON.stringify({ parentId: '10' }),
     });
@@ -98,12 +99,14 @@ describe('move operation plans', () => {
       {
         operationId: 'operation:2',
         bookmarkId: 'chrome:5',
+        sourceId: '5',
         parentId: '30',
         index: 2,
       },
       {
         operationId: 'operation:1',
         bookmarkId: 'chrome:4',
+        sourceId: '4',
         parentId: '20',
         index: 7,
       },

@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
 
+import { createLocalBookmarkSnapshot } from '../snapshots/bookmark-snapshot';
+import { downloadJson } from '../snapshots/download-json';
+import {
+  createMoveOperationPlan,
+  saveMoveOperationPlan,
+} from '../operations/move-operation-plan';
+import { executeStoredMoveOperationBatch } from '../operations/move-executor';
 import {
   buildFolderMoveBatchPreview,
   generateChromeFolderMoveSuggestions,
@@ -24,12 +31,17 @@ export function FolderMoveSuggestions({
   const [error, setError] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [executionMessage, setExecutionMessage] = useState<string | null>(null);
+  const [executionError, setExecutionError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setIsLoading(true);
     setSelectedIds(new Set());
     setIsPreviewOpen(false);
+    setExecutionMessage(null);
+    setExecutionError(null);
 
     generateChromeFolderMoveSuggestions()
       .then((nextSuggestions) => {
@@ -82,6 +94,35 @@ export function FolderMoveSuggestions({
     setIsPreviewOpen(false);
   };
 
+  const executeSelected = async (): Promise<void> => {
+    if (selectedSuggestions.length === 0 || isExecuting) return;
+
+    setIsExecuting(true);
+    setExecutionMessage(null);
+    setExecutionError(null);
+    try {
+      const snapshot = await createLocalBookmarkSnapshot();
+      downloadJson(snapshot.filename, snapshot.json);
+      const plan = createMoveOperationPlan(
+        selectedSuggestions,
+        snapshot.record.id,
+      );
+      await saveMoveOperationPlan(plan);
+      await executeStoredMoveOperationBatch(plan.batch.id);
+      setSelectedIds(new Set());
+      setIsPreviewOpen(false);
+      setExecutionMessage(
+        `已完成 ${selectedSuggestions.length} 条书签移动，快照已下载并保存。`,
+      );
+    } catch (cause: unknown) {
+      setExecutionError(
+        cause instanceof Error ? cause.message : '移动失败，已尝试回滚。',
+      );
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
   return (
     <section
       className="move-suggestions"
@@ -91,7 +132,8 @@ export function FolderMoveSuggestions({
         <div>
           <h2 id="move-suggestions-title">文件夹移动建议预览</h2>
           <p>
-            仅在同一域名至少 75% 集中于一个文件夹时生成建议；当前不能执行移动。
+            仅在同一域名至少 75%
+            集中于一个文件夹时生成建议；执行前会自动创建快照。
           </p>
         </div>
         <div className="move-suggestions__summary" aria-live="polite">
@@ -100,6 +142,12 @@ export function FolderMoveSuggestions({
       </header>
 
       {error ? <p className="status status--error">{error}</p> : null}
+      {executionMessage ? (
+        <p className="status status--success">{executionMessage}</p>
+      ) : null}
+      {executionError ? (
+        <p className="status status--error">{executionError}</p>
+      ) : null}
       {!isLoading && !error && suggestions.length === 0 ? (
         <div className="move-suggestions__empty">暂无高置信度移动建议。</div>
       ) : null}
@@ -209,10 +257,15 @@ export function FolderMoveSuggestions({
           </ul>
 
           <div className="move-batch-preview__safety">
-            正式开放执行前，每个批次必须先创建快照、写入操作日志并支持撤销。
+            执行会先下载并保存 JSON
+            快照，再写入操作日志；如果中途失败，已完成步骤会自动逆序回滚。
           </div>
-          <button type="button" disabled>
-            执行移动（尚未开放）
+          <button
+            type="button"
+            disabled={isExecuting}
+            onClick={() => void executeSelected()}
+          >
+            {isExecuting ? '正在创建快照并执行…' : '创建快照并执行移动'}
           </button>
         </section>
       ) : null}

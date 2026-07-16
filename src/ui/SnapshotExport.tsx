@@ -1,20 +1,7 @@
 import { useState } from 'react';
 
 import { createLocalBookmarkSnapshot } from '../snapshots/bookmark-snapshot';
-
-function downloadJson(filename: string, json: string): void {
-  const url = URL.createObjectURL(
-    new Blob([json], { type: 'application/json;charset=utf-8' }),
-  );
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  link.hidden = true;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 0);
-}
+import { downloadJson } from '../snapshots/download-json';
 
 export function SnapshotExport() {
   const [isExporting, setIsExporting] = useState(false);

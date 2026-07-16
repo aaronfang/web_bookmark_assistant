@@ -18,6 +18,7 @@ export interface MoveOperationPlan {
 export interface MoveUndoStep extends BookmarkMoveLocation {
   operationId: string;
   bookmarkId: string;
+  sourceId: string;
 }
 
 interface MoveOperationPlanIds {
@@ -29,7 +30,9 @@ function serializeLocation(location: BookmarkMoveLocation): string {
   return JSON.stringify(location);
 }
 
-function parseLocation(serialized: string | undefined): BookmarkMoveLocation {
+export function parseMoveLocation(
+  serialized: string | undefined,
+): BookmarkMoveLocation {
   if (!serialized) throw new Error('Move operation is missing location data');
 
   const value: unknown = JSON.parse(serialized);
@@ -76,13 +79,18 @@ export function buildMoveOperationPlan(
       if (!sourceParentId) {
         throw new Error(`Bookmark ${suggestion.bookmark.id} has no parent`);
       }
+      if (!suggestion.bookmark.sourceId) {
+        throw new Error(`Bookmark ${suggestion.bookmark.id} has no source id`);
+      }
 
       return {
         id: ids.operationId(suggestion, index),
         batchId: ids.batchId,
         kind: 'move',
         status: 'pending',
+        sequence: index,
         bookmarkId: suggestion.bookmark.id,
+        sourceId: suggestion.bookmark.sourceId,
         createdAt,
         before: serializeLocation({
           parentId: sourceParentId,
@@ -130,7 +138,8 @@ export function buildMoveUndoSteps(
     .map((operation) => ({
       operationId: operation.id,
       bookmarkId: operation.bookmarkId,
-      ...parseLocation(operation.before),
+      sourceId: operation.sourceId,
+      ...parseMoveLocation(operation.before),
     }));
 }
 

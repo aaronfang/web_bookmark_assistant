@@ -55,7 +55,9 @@ export interface BookmarkOperation {
   batchId: string;
   kind: 'create' | 'update' | 'move' | 'archive' | 'delete';
   status: 'pending' | 'applied' | 'reverted' | 'failed';
+  sequence: number;
   bookmarkId: string;
+  sourceId: string;
   createdAt: string;
   before?: string;
   after?: string;
