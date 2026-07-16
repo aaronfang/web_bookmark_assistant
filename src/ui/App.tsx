@@ -5,11 +5,8 @@ import { readChromeBookmarkSummary } from '../chrome/bookmark-reader';
 import { synchronizeChromeBookmarkMirror } from '../repositories/chrome-bookmark-repository';
 import { countIndependentBookmarks } from '../repositories/local-bookmark-repository';
 import { invalidateBookmarkSearchIndex } from '../search/bookmark-search';
-import { BookmarkFolderBrowser } from './BookmarkFolderBrowser';
-import { BookmarkHealthCheck } from './BookmarkHealthCheck';
 import { BookmarkSearch } from './BookmarkSearch';
-import { DuplicateBookmarkDetector } from './DuplicateBookmarkDetector';
-import { SnapshotExport } from './SnapshotExport';
+import { OptionsDashboard } from './OptionsDashboard';
 
 type Surface = 'popup' | 'sidepanel' | 'newtab' | 'options';
 
@@ -92,46 +89,45 @@ export function App({ surface }: AppProps) {
         <BookmarkSearch revision={bookmarkRevision} />
       ) : null}
 
-      <section className="stats" aria-label="书签概况">
-        <article>
-          <strong>{stats?.chromeBookmarks ?? '—'}</strong>
-          <span>Chrome 书签</span>
-        </article>
-        <article>
-          <strong>{stats?.chromeFolders ?? '—'}</strong>
-          <span>Chrome 文件夹</span>
-        </article>
-        <article>
-          <strong>{stats?.independentBookmarks ?? '—'}</strong>
-          <span>独立书签</span>
-        </article>
-      </section>
-
-      {surface === 'options' && stats ? (
+      {surface === 'options' ? (
+        stats ? (
+          <OptionsDashboard revision={bookmarkRevision} stats={stats} />
+        ) : null
+      ) : (
         <>
-          <BookmarkFolderBrowser revision={bookmarkRevision} />
-          <DuplicateBookmarkDetector revision={bookmarkRevision} />
-          <BookmarkHealthCheck revision={bookmarkRevision} />
-          <SnapshotExport />
-        </>
-      ) : null}
+          <section className="stats" aria-label="书签概况">
+            <article>
+              <strong>{stats?.chromeBookmarks ?? '—'}</strong>
+              <span>Chrome 书签</span>
+            </article>
+            <article>
+              <strong>{stats?.chromeFolders ?? '—'}</strong>
+              <span>Chrome 文件夹</span>
+            </article>
+            <article>
+              <strong>{stats?.independentBookmarks ?? '—'}</strong>
+              <span>独立书签</span>
+            </article>
+          </section>
 
-      <section className="notice">
-        <h2>安全基线已启用</h2>
-        <p>
-          当前版本只读取并建立本地搜索索引，不会移动、修改或删除任何 Chrome
-          书签。
-        </p>
-        <ul className="permission-list">
-          <li>
-            <strong>书签</strong>：只用于读取书签树；当前没有 Chrome
-            书签写入路径。
-          </li>
-          <li>
-            <strong>侧边栏</strong>：用于从工具栏打开主要界面。
-          </li>
-        </ul>
-      </section>
+          <section className="notice">
+            <h2>安全基线已启用</h2>
+            <p>
+              当前版本只读取并建立本地搜索索引，不会移动、修改或删除任何 Chrome
+              书签。
+            </p>
+            <ul className="permission-list">
+              <li>
+                <strong>书签</strong>：只用于读取书签树；当前没有 Chrome
+                书签写入路径。
+              </li>
+              <li>
+                <strong>侧边栏</strong>：用于从工具栏打开主要界面。
+              </li>
+            </ul>
+          </section>
+        </>
+      )}
     </main>
   );
 }

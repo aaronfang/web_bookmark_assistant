@@ -22,6 +22,10 @@ test('loads fixture bookmarks in an isolated Chrome profile', async () => {
       context.serviceWorkers()[0] ??
       (await context.waitForEvent('serviceworker'));
     const extensionId = new URL(serviceWorker.url()).host;
+    const optionsOpenInTab = await serviceWorker.evaluate(
+      () => chrome.runtime.getManifest().options_ui?.open_in_tab,
+    );
+    expect(optionsOpenInTab).toBe(true);
 
     await serviceWorker.evaluate(async () => {
       const folder = await chrome.bookmarks.create({
@@ -49,7 +53,13 @@ test('loads fixture bookmarks in an isolated Chrome profile', async () => {
         .locator('.stats article', { hasText: 'Chrome 书签' })
         .locator('strong'),
     ).toHaveText('2');
-    await expect(page.getByText('当前没有 Chrome 书签写入路径')).toBeVisible();
+    await expect(page.getByRole('heading', { name: '管理概览' })).toBeVisible();
+    await expect(page.getByText('诊断和整理建议均为预览')).toBeVisible();
+    const dashboardNavigation = page.getByRole('navigation', {
+      name: '管理功能',
+    });
+    await dashboardNavigation.getByRole('link', { name: '文件夹' }).click();
+    await expect(page).toHaveURL(/options\.html#folders$/);
     await expect(
       page.getByRole('heading', { name: '书签文件夹' }),
     ).toBeVisible();
@@ -64,6 +74,8 @@ test('loads fixture bookmarks in an isolated Chrome profile', async () => {
     ).toBeVisible();
     await expect(page.getByRole('link', { name: /MDN/ })).toBeVisible();
 
+    await dashboardNavigation.getByRole('link', { name: '备份与恢复' }).click();
+    await expect(page).toHaveURL(/options\.html#backup$/);
     const downloadPromise = page.waitForEvent('download');
     await page.getByRole('button', { name: '导出 JSON 快照' }).click();
     const download = await downloadPromise;
@@ -85,6 +97,7 @@ test('loads fixture bookmarks in an isolated Chrome profile', async () => {
     );
     await expect(page.getByText('已导出 2 条本地索引记录')).toBeVisible();
 
+    await dashboardNavigation.getByRole('link', { name: '文件夹' }).click();
     const liveFolderId = await serviceWorker.evaluate(async () => {
       const folder = await chrome.bookmarks.create({
         parentId: '1',
@@ -102,6 +115,7 @@ test('loads fixture bookmarks in an isolated Chrome profile', async () => {
       folderNavigation.getByRole('button', { name: /^Live folder tree 0$/ }),
     ).toHaveCount(0);
 
+    await dashboardNavigation.getByRole('link', { name: '重复检测' }).click();
     const duplicateId = await serviceWorker.evaluate(async () => {
       const [fixtureFolder] = await chrome.bookmarks.search({
         title: 'Phase 0 fixture',
@@ -125,6 +139,7 @@ test('loads fixture bookmarks in an isolated Chrome profile', async () => {
     }, duplicateId);
     await expect(duplicateDetector.getByText('没有发现重复书签')).toBeVisible();
 
+    await dashboardNavigation.getByRole('link', { name: '健康检查' }).click();
     const healthFixtures = await serviceWorker.evaluate(async () => {
       const [fixtureFolder] = await chrome.bookmarks.search({
         title: 'Phase 0 fixture',
@@ -166,6 +181,53 @@ test('loads fixture bookmarks in an isolated Chrome profile', async () => {
       healthFixtures,
     );
     await expect(healthCheck.getByText('0 条候选')).toBeVisible();
+
+    await dashboardNavigation.getByRole('link', { name: '整理建议' }).click();
+    const suggestionFolders = await serviceWorker.evaluate(async () => {
+      const targetFolder = await chrome.bookmarks.create({
+        parentId: '1',
+        title: 'Docs Majority',
+      });
+      const sourceFolder = await chrome.bookmarks.create({
+        parentId: '1',
+        title: 'Docs Other',
+      });
+      for (const index of [1, 2, 3]) {
+        await chrome.bookmarks.create({
+          parentId: targetFolder.id,
+          title: `Docs Main ${index}`,
+          url: `https://organize.example.test/docs/${index}`,
+        });
+      }
+      await chrome.bookmarks.create({
+        parentId: sourceFolder.id,
+        title: 'Docs Outlier',
+        url: 'https://organize.example.test/docs/outlier',
+      });
+      return {
+        sourceFolderId: sourceFolder.id,
+        targetFolderId: targetFolder.id,
+      };
+    });
+    const moveSuggestions = page.locator('.move-suggestions');
+    await expect(moveSuggestions.getByText('1 条建议')).toBeVisible();
+    await expect(
+      moveSuggestions.getByRole('link', { name: 'Docs Outlier' }),
+    ).toBeVisible();
+    await expect(
+      moveSuggestions.getByText('75%', { exact: true }),
+    ).toBeVisible();
+    await expect(
+      moveSuggestions.getByText('Bookmarks Bar / Docs Majority'),
+    ).toBeVisible();
+
+    await serviceWorker.evaluate(async ({ sourceFolderId, targetFolderId }) => {
+      await chrome.bookmarks.removeTree(sourceFolderId);
+      await chrome.bookmarks.removeTree(targetFolderId);
+    }, suggestionFolders);
+    await expect(
+      moveSuggestions.getByText('暂无高置信度移动建议'),
+    ).toBeVisible();
 
     await page.goto(`chrome-extension://${extensionId}/sidepanel.html`);
     await page.getByRole('searchbox', { name: '搜索书签' }).fill('MDN');
