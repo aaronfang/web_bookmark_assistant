@@ -26,6 +26,15 @@ export interface BookmarkSnapshot {
   payload: string;
 }
 
+export interface LinkHealthRecord {
+  bookmarkId: string;
+  url: string;
+  status: string;
+  httpStatus?: number;
+  checkedAt: string;
+  message: string;
+}
+
 export interface BookmarkTag {
   id: string;
   name: string;

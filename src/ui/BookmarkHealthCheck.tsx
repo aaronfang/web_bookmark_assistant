@@ -5,6 +5,11 @@ import {
   type BookmarkHealthIssue,
   type BookmarkHealthIssueKind,
 } from '../health/bookmark-health';
+import {
+  checkBookmarkLinks,
+  type LinkHealthResult,
+} from '../health/link-health';
+import { database } from '../db/database';
 
 const ISSUE_RENDER_LIMIT = 100;
 
@@ -25,6 +30,23 @@ export function BookmarkHealthCheck({ revision }: BookmarkHealthCheckProps) {
   const [filter, setFilter] = useState<HealthFilter>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [linkResults, setLinkResults] = useState<LinkHealthResult[]>([]);
+  const [checkingLinks, setCheckingLinks] = useState(false);
+
+  const runLinkCheck = async (): Promise<void> => {
+    setCheckingLinks(true);
+    try {
+      const bookmarks = await database.bookmarks
+        .where('source')
+        .equals('chrome')
+        .toArray();
+      setLinkResults(await checkBookmarkLinks(bookmarks));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '链接检查失败');
+    } finally {
+      setCheckingLinks(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -48,6 +70,12 @@ export function BookmarkHealthCheck({ revision }: BookmarkHealthCheckProps) {
     return () => {
       cancelled = true;
     };
+  }, [revision]);
+
+  useEffect(() => {
+    void database.linkHealth
+      .toArray()
+      .then((results) => setLinkResults(results as LinkHealthResult[]));
   }, [revision]);
 
   const count = (kind: BookmarkHealthIssueKind): number =>
@@ -85,6 +113,9 @@ export function BookmarkHealthCheck({ revision }: BookmarkHealthCheckProps) {
         <div className="health-check__summary" aria-live="polite">
           {isLoading ? '正在检查…' : `${issues.length} 条候选`}
         </div>
+        <button type="button" onClick={runLinkCheck} disabled={checkingLinks}>
+          {checkingLinks ? '检查中…' : '检查链接'}
+        </button>
       </header>
 
       <div className="health-check__filters" aria-label="健康问题筛选">
@@ -131,6 +162,18 @@ export function BookmarkHealthCheck({ revision }: BookmarkHealthCheckProps) {
           </article>
         ))}
       </div>
+
+      {linkResults.length > 0 ? (
+        <div className="health-check__links" aria-live="polite">
+          <strong>链接检查结果：{linkResults.length} 条</strong>
+          {linkResults.map((result) => (
+            <p key={result.bookmarkId}>
+              {result.status === 'healthy' ? '✓' : '⚠'} {result.url}：
+              {result.message}
+            </p>
+          ))}
+        </div>
+      ) : null}
 
       {filteredIssues.length > ISSUE_RENDER_LIMIT ? (
         <p className="health-check__limit">
