@@ -15,6 +15,7 @@ export async function saveIndependentBookmark(
     source: 'local',
     title: input.title,
     url: input.url,
+    folderPath: [],
     tags: input.tags ?? [],
     note: input.note ?? '',
     readingStatus: input.readingStatus ?? 'inbox',

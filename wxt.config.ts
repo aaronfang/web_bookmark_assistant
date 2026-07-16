@@ -6,7 +6,7 @@ export default defineConfig({
     name: 'Web Bookmark Assistant',
     description: '本地优先的 Chrome 书签检索、分类和回顾助手',
     version: '0.1.0',
-    permissions: ['bookmarks', 'storage', 'sidePanel', 'alarms'],
+    permissions: ['bookmarks', 'sidePanel'],
     action: {
       default_title: 'Web Bookmark Assistant',
     },

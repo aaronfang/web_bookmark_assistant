@@ -81,6 +81,8 @@ Chrome Extension
 
 验收：数万条书签下可稳定加载；常用查询在本地即时返回；不修改原始结构。
 
+当前进度（2026-07-16）：Phase 1 计划项已完成。包括书签树只读展开与分层浏览、文件夹路径保留、IndexedDB 镜像同步、可失效的内存搜索索引、侧边栏标题/URL/文件夹多关键词搜索，以及创建、修改、移动、删除和导入事件监听；同步时会保留本地标签、备注和阅读状态。20,000 条模拟书签的索引和查询性能回归已通过。管理页可导出带格式版本的本地 JSON 快照，包含完整 Chrome 书签树与本地元数据，并保留 IndexedDB 快照历史。
+
 ### Phase 2：安全整理
 
 - URL 规范化和精确/疑似重复检测。
@@ -137,16 +139,17 @@ Chrome Extension
 ## 7. 当前环境审计（2026-07-16）
 
 - 工作目录：已生成 WXT + React + TypeScript 工程骨架
-- Git 仓库：已初始化，默认分支为 `main`，尚未创建初始提交
-- Node.js：25.7.0（建议项目锁定 Node 24 LTS）
-- npm：11.10.1
+- Git 仓库：已初始化，默认分支为 `main`，已连接 `origin/main`
+- Node.js：已通过 Homebrew 安装 24.18.0，项目用 `.node-version`、`.nvmrc` 和 `engine-strict` 锁定 24.x
+- npm：11.16.0
 - Git：2.53.0
 - Python：3.14.2
 - uv：0.11.19
 - pnpm：未安装
 - Docker：未安装
+- Chrome：已安装于 `/Applications/Google Chrome.app`
 
-Phase 0 当前验证结果：TypeScript、ESLint、3 个单元测试和 Chrome MV3 生产构建全部通过；生产依赖审计为 0 个已知漏洞。
+Phase 0 当前包含：最小权限 Manifest、权限说明、完整基础数据模型、隔离 Chrome Profile 的模拟书签 E2E、Vitest、Playwright 和 CI。TypeScript、ESLint、单元测试、Chrome MV3 生产构建及 E2E 均纳入本地检查；生产依赖审计为 0 个已知漏洞。
 
 插件优先的 Phase 0 不依赖 Docker。只有选择本地部署 Karakeep/Linkwarden 时才需要 Docker Desktop 或等效容器环境。
 

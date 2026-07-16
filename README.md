@@ -4,32 +4,64 @@
 
 ## 当前状态
 
-项目处于 Phase 0。扩展默认只读访问 Chrome 原生书签，同时为插件独立书签库预留了本地 IndexedDB 数据模型。AI 接口默认禁用，不会上传书签内容。
+项目已完成 Phase 0 和 Phase 1。扩展会只读导入 Chrome 原生书签到本地 IndexedDB，在侧边栏提供标题、URL 和文件夹搜索，在管理页按原始层级浏览文件夹，并监听 Chrome 书签变化实时刷新结果。AI 接口默认禁用，不会上传书签内容。
 
 ## 环境要求
 
-- Node.js 24 LTS
+- macOS 13+
+- Node.js 24 LTS（项目会拒绝其他主版本）
 - npm 11+
 - Chrome 114+（支持 Side Panel）
 
+## macOS 首次配置
+
+```bash
+brew install node@24
+echo 'export PATH="/opt/homebrew/opt/node@24/bin:$PATH"' >> ~/.zshrc
+export PATH="/opt/homebrew/opt/node@24/bin:$PATH"
+npm ci
+npm run env:check
+npx playwright install --no-shell chromium
+```
+
+项目不依赖 Docker。请保留 `package-lock.json`，日常安装使用 `npm ci`。
+
 ## 开发
 
-```powershell
-npm install
+```bash
 npm run dev
 ```
 
-WXT 会输出开发扩展目录。请使用独立 Chrome Profile，在 `chrome://extensions` 开启开发者模式并加载解压缩扩展。
+WXT 会输出 `.output/chrome-mv3`。请使用独立 Chrome Profile，在
+`chrome://extensions` 开启开发者模式并加载该目录。不要用日常 Profile 做破坏性测试。
+
+生产构建后，在 `chrome://extensions` 点击扩展的“重新加载”按钮即可体验最新版本：
+
+```bash
+npm run build
+```
 
 ## 检查
 
-```powershell
+```bash
 npm run check
+npm run test:performance
+npm run test:e2e
 ```
+
+E2E 测试每次创建临时 Chromium Profile，写入的模拟书签不会接触真实 Chrome 数据。
+性能测试会生成 20,000 条内存模拟书签，验证索引构建和查询耗时，不会写入 Chrome 或 IndexedDB。
+
+## 本地快照
+
+在扩展的“书签管理”页面点击“导出 JSON 快照”，可以下载包含完整 Chrome 书签树和本地标签、备注、阅读状态的版本化备份。快照同时保存在扩展的 IndexedDB 历史中，不会上传；文件包含完整网址，可能带有敏感查询参数。
+
+同一页面提供只读文件夹树：左侧显示 Chrome 原始层级和递归书签数，右侧显示所选文件夹的子文件夹与直接书签。
 
 ## 安全约束
 
 - 当前版本不移动或删除 Chrome 书签。
+- Manifest 当前仅申请 `bookmarks` 和 `sidePanel`；尚未使用的权限不会提前申请。
 - 自动化测试不得使用日常 Chrome Profile。
 - AI Provider 默认关闭。
 - 后续所有批量修改必须先生成快照并支持撤销。
