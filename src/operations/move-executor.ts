@@ -188,3 +188,88 @@ export async function executeStoredMoveOperationBatch(
     },
   );
 }
+
+export async function undoMoveOperationPlan(
+  plan: MoveOperationPlan,
+  dependencies: MoveExecutorDependencies,
+): Promise<void> {
+  const { store, chrome } = dependencies;
+  const now = dependencies.now ?? (() => new Date().toISOString());
+  if (!(await store.getSnapshot(plan.batch.snapshotId))) {
+    throw new MoveExecutionError('Required snapshot is missing', false);
+  }
+  if (plan.batch.status !== 'completed') {
+    throw new MoveExecutionError('Only completed batches can be undone', false);
+  }
+
+  await store.updateBatch(plan.batch.id, {
+    status: 'reverting',
+    updatedAt: now(),
+  });
+  try {
+    for (const operation of [...plan.operations].sort(
+      (a, b) => b.sequence - a.sequence,
+    )) {
+      const after = parseMoveLocation(operation.after);
+      const current = await chrome.getBookmark(operation.sourceId);
+      if (!locationMatches(current, after)) {
+        throw new Error(
+          `Bookmark ${operation.bookmarkId} changed since execution`,
+        );
+      }
+      await chrome.moveBookmark(
+        operation.sourceId,
+        parseMoveLocation(operation.before),
+      );
+      await store.updateOperation(operation.id, {
+        status: 'reverted',
+        revertedAt: now(),
+      });
+    }
+    await store.updateBatch(plan.batch.id, {
+      status: 'reverted',
+      updatedAt: now(),
+      revertedAt: now(),
+    });
+  } catch (cause: unknown) {
+    const reason = cause instanceof Error ? cause.message : 'Undo failed';
+    await store.updateBatch(plan.batch.id, {
+      status: 'failed',
+      updatedAt: now(),
+      error: reason,
+    });
+    throw new MoveExecutionError(reason, false);
+  }
+}
+
+export async function undoStoredMoveOperationBatch(
+  batchId: string,
+): Promise<void> {
+  const batch = await database.operationBatches.get(batchId);
+  if (!batch) throw new Error(`Operation batch ${batchId} was not found`);
+  const operations = await database.operations
+    .where('batchId')
+    .equals(batchId)
+    .sortBy('sequence');
+  await undoMoveOperationPlan(
+    { batch, operations },
+    {
+      store: {
+        getSnapshot: (id) => database.snapshots.get(id),
+        updateBatch: (id, changes) =>
+          database.operationBatches.update(id, changes).then(() => undefined),
+        updateOperation: (id, changes) =>
+          database.operations.update(id, changes).then(() => undefined),
+      },
+      chrome: {
+        getBookmark: async (id) => {
+          const [node] = await chrome.bookmarks.get(id);
+          if (!node) throw new Error(`Bookmark ${id} was not found`);
+          return node;
+        },
+        moveBookmark: (id, destination) =>
+          chrome.bookmarks.move(id, destination),
+      },
+    },
+  );
+}

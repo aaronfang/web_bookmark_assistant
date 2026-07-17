@@ -11,6 +11,7 @@ import {
 } from './move-operation-plan';
 import {
   executeMoveOperationPlan,
+  undoMoveOperationPlan,
   type ChromeBookmarkMovePort,
   type MoveExecutorStore,
 } from './move-executor';
@@ -218,5 +219,34 @@ describe('executeMoveOperationPlan', () => {
     });
     expect(chrome.moveCalls).toBe(0);
     expect(store.batches.get('batch:1')?.status).toBe('failed');
+  });
+
+  it('undoes a completed move in reverse order', async () => {
+    const plan = createPlan();
+    const store = new FakeStore({
+      batch: { ...plan.batch, status: 'completed' },
+      operations: [
+        {
+          ...plan.operations[0]!,
+          status: 'applied',
+          after: JSON.stringify({ parentId: '10', index: 0 }),
+        },
+      ],
+    });
+    const chrome = new FakeChrome();
+    chrome.locations.set('4', { parentId: '10', index: 0 });
+
+    await undoMoveOperationPlan(
+      {
+        ...plan,
+        batch: { ...plan.batch, status: 'completed' },
+        operations: [store.operations.get('operation:1')!],
+      },
+      { store, chrome },
+    );
+
+    expect(chrome.locations.get('4')).toEqual({ parentId: '20', index: 7 });
+    expect(store.batches.get('batch:1')?.status).toBe('reverted');
+    expect(store.operations.get('operation:1')?.status).toBe('reverted');
   });
 });
