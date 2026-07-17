@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { database } from '../db/database';
 import type { ReadingStatus } from '../domain/bookmark';
 import { upsertChromeBookmarkMirror } from '../repositories/chrome-bookmark-repository';
+import { extractActiveTabMetadata } from '../content/page-metadata-client';
 
 interface FolderOption {
   id: string;
@@ -38,6 +39,7 @@ export function QuickCapture() {
   const [readingStatus, setReadingStatus] = useState<ReadingStatus>('inbox');
   const [status, setStatus] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [tabId, setTabId] = useState<number | null>(null);
 
   useEffect(() => {
     void Promise.all([
@@ -45,6 +47,7 @@ export function QuickCapture() {
       chrome.bookmarks.getTree(),
     ]).then(([tabs, tree]) => {
       const tab = tabs[0];
+      setTabId(tab?.id ?? null);
       setTitle(tab?.title ?? '');
       setUrl(tab?.url ?? '');
       const nextFolders = folderOptions(tree);
@@ -52,6 +55,25 @@ export function QuickCapture() {
       setFolderId(nextFolders[0]?.id ?? '');
     });
   }, []);
+
+  const readMetadata = async (): Promise<void> => {
+    if (tabId === null) return;
+    try {
+      const metadata = await extractActiveTabMetadata(tabId);
+      const text = [metadata.description, metadata.selectedText]
+        .filter(Boolean)
+        .join('\n\n');
+      if (text)
+        setNote((current) => (current ? `${current}\n\n${text}` : text));
+      setStatus(
+        text
+          ? '已读取页面描述和选中文本。'
+          : '当前页面没有可读取的描述或选中文本。',
+      );
+    } catch {
+      setStatus('无法读取当前页面内容，请确认页面允许扩展访问。');
+    }
+  };
 
   const save = async (): Promise<void> => {
     if (!title.trim() || !url.trim() || !folderId || saving) return;
@@ -126,6 +148,13 @@ export function QuickCapture() {
           onChange={(event) => setNote(event.target.value)}
         />
       </label>
+      <button
+        type="button"
+        onClick={() => void readMetadata()}
+        disabled={tabId === null}
+      >
+        读取页面描述/选中文本
+      </button>
       <label>
         阅读状态
         <select
