@@ -40,8 +40,6 @@ export function FolderMoveSuggestions({
     setIsLoading(true);
     setSelectedIds(new Set());
     setIsPreviewOpen(false);
-    setExecutionMessage(null);
-    setExecutionError(null);
 
     generateChromeFolderMoveSuggestions()
       .then((nextSuggestions) => {
