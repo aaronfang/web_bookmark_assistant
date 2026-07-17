@@ -84,8 +84,14 @@ export class OllamaProvider implements AiProvider {
           signal: controller.signal,
         },
       );
-      if (!response.ok)
+      if (!response.ok) {
+        if (response.status === 403) {
+          throw new Error(
+            'Ollama rejected this extension origin (HTTP 403). Configure OLLAMA_ORIGINS and restart Ollama.',
+          );
+        }
         throw new Error(`Ollama request failed with HTTP ${response.status}`);
+      }
       const payload = (await response.json()) as OllamaResponse;
       if (!payload.response?.trim())
         throw new Error('Ollama returned an empty response');
