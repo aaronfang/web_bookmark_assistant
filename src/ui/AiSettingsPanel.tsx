@@ -1,19 +1,22 @@
 import { useState } from 'react';
 
 import { OllamaProvider } from '../ai/ollama-provider';
+import { OpenAiCompatibleProvider } from '../ai/openai-compatible-provider';
 
 const STORAGE_KEY = 'wba-ai-settings';
 
 interface AiSettings {
-  provider: 'disabled' | 'ollama';
+  provider: 'disabled' | 'ollama' | 'openai-compatible';
   baseUrl: string;
   model: string;
+  apiKey: string;
 }
 
 const defaults: AiSettings = {
   provider: 'disabled',
   baseUrl: 'http://127.0.0.1:11434',
   model: 'llama3',
+  apiKey: '',
 };
 
 function loadSettings(): AiSettings {
@@ -39,14 +42,19 @@ export function AiSettingsPanel() {
   const testConnection = async (): Promise<void> => {
     setMessage(null);
     try {
-      const provider = new OllamaProvider(settings);
+      const provider =
+        settings.provider === 'ollama'
+          ? new OllamaProvider(settings)
+          : new OpenAiCompatibleProvider(settings);
       await provider.summarize({
         title: '连接测试',
         url: 'https://example.com',
       });
-      setMessage('Ollama 连接成功。');
+      setMessage('AI Provider 连接成功。');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Ollama 连接失败。');
+      setMessage(
+        error instanceof Error ? error.message : 'AI Provider 连接失败。',
+      );
     }
   };
 
@@ -68,16 +76,34 @@ export function AiSettingsPanel() {
         >
           <option value="disabled">禁用</option>
           <option value="ollama">本地 Ollama</option>
+          <option value="openai-compatible">OpenAI 兼容 API</option>
         </select>
       </label>
       <label>
-        Ollama 地址
+        API 地址
         <input
           value={settings.baseUrl}
           disabled={settings.provider === 'disabled'}
           onChange={(event) => update({ baseUrl: event.target.value })}
         />
       </label>
+      {settings.provider === 'ollama' ? (
+        <p className="notice">
+          首次使用 Ollama：先运行 <code>ollama serve</code>，执行{' '}
+          <code>ollama list</code> 确认模型名称；如果测试返回 403，需要设置{' '}
+          <code>OLLAMA_ORIGINS</code> 后重启 Ollama。
+        </p>
+      ) : null}
+      {settings.provider === 'openai-compatible' ? (
+        <label>
+          API Key
+          <input
+            type="password"
+            value={settings.apiKey}
+            onChange={(event) => update({ apiKey: event.target.value })}
+          />
+        </label>
+      ) : null}
       <label>
         模型
         <input
@@ -92,7 +118,10 @@ export function AiSettingsPanel() {
         </button>{' '}
         <button
           type="button"
-          disabled={settings.provider === 'disabled'}
+          disabled={
+            settings.provider === 'disabled' ||
+            (settings.provider === 'openai-compatible' && !settings.apiKey)
+          }
           onClick={() => void testConnection()}
         >
           测试连接
