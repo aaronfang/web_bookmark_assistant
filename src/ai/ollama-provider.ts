@@ -28,7 +28,10 @@ export class OllamaProvider implements AiProvider {
   private readonly config: Required<OllamaConfig>;
   private readonly fetchImpl: typeof fetch;
 
-  constructor(config: OllamaConfig, fetchImpl: typeof fetch = fetch) {
+  constructor(
+    config: OllamaConfig,
+    fetchImpl: typeof fetch = globalThis.fetch.bind(globalThis),
+  ) {
     this.config = {
       baseUrl: config.baseUrl.replace(/\/$/, ''),
       model: config.model,
