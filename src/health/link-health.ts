@@ -78,11 +78,14 @@ export async function checkBookmarkLink(
 export async function checkBookmarkLinks(
   bookmarks: readonly Pick<BookmarkRecord, 'id' | 'url'>[],
   fetchImpl?: typeof fetch,
+  persist: (results: readonly LinkHealthResult[]) => Promise<unknown> = (
+    results,
+  ) => database.linkHealth.bulkPut(results),
 ): Promise<LinkHealthResult[]> {
   const results = await Promise.all(
     bookmarks.map((bookmark) => checkBookmarkLink(bookmark, fetchImpl)),
   );
-  await database.linkHealth.bulkPut(results);
+  await persist(results);
   return results;
 }
 
