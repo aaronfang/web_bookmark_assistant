@@ -38,4 +38,15 @@ describe('link health checks', () => {
     expect(persist).toHaveBeenCalledOnce();
     expect(persist).toHaveBeenCalledWith(results);
   });
+
+  it('does not fetch javascript bookmark URLs', async () => {
+    const fetcher = vi.fn<typeof fetch>();
+    await expect(
+      checkBookmarkLink(
+        { id: 'chrome:script', url: 'javascript:alert(1)' },
+        fetcher,
+      ),
+    ).resolves.toMatchObject({ status: 'network-error' });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
 });

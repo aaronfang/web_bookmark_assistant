@@ -35,6 +35,27 @@ export async function checkBookmarkLink(
   timeoutMs = LINK_CHECK_TIMEOUT_MS,
 ): Promise<LinkHealthResult> {
   const checkedAt = new Date().toISOString();
+  let protocol: string;
+  try {
+    protocol = new URL(bookmark.url).protocol;
+  } catch {
+    return {
+      bookmarkId: bookmark.id,
+      url: bookmark.url,
+      status: 'network-error',
+      checkedAt,
+      message: '网址格式无效，未发起网络请求。',
+    };
+  }
+  if (protocol !== 'http:' && protocol !== 'https:') {
+    return {
+      bookmarkId: bookmark.id,
+      url: bookmark.url,
+      status: 'network-error',
+      checkedAt,
+      message: `不支持 ${protocol.replace(':', '')} 协议，未发起网络请求。`,
+    };
+  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
