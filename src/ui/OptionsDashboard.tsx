@@ -5,9 +5,16 @@ import { BookmarkHealthCheck } from './BookmarkHealthCheck';
 import { DuplicateBookmarkDetector } from './DuplicateBookmarkDetector';
 import { FolderMoveSuggestions } from './FolderMoveSuggestions';
 import { SnapshotExport } from './SnapshotExport';
+import { OperationHistory } from './OperationHistory';
 
 type DashboardSection =
-  'overview' | 'folders' | 'duplicates' | 'health' | 'suggestions' | 'backup';
+  | 'overview'
+  | 'folders'
+  | 'duplicates'
+  | 'health'
+  | 'suggestions'
+  | 'history'
+  | 'backup';
 
 interface OptionsDashboardProps {
   stats: {
@@ -24,6 +31,7 @@ const validSections = new Set<DashboardSection>([
   'duplicates',
   'health',
   'suggestions',
+  'history',
   'backup',
 ]);
 
@@ -52,7 +60,10 @@ const navigationGroups: Array<{
   },
   {
     label: '整理',
-    items: [{ id: 'suggestions', label: '整理建议' }],
+    items: [
+      { id: 'suggestions', label: '整理建议' },
+      { id: 'history', label: '操作历史' },
+    ],
   },
   {
     label: '数据',
@@ -128,6 +139,9 @@ export function OptionsDashboard({ stats, revision }: OptionsDashboardProps) {
       break;
     case 'suggestions':
       panel = <FolderMoveSuggestions revision={revision} />;
+      break;
+    case 'history':
+      panel = <OperationHistory revision={revision} />;
       break;
     case 'backup':
       panel = <SnapshotExport />;
