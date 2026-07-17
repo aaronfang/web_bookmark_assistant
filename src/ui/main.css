@@ -38,6 +38,46 @@ body {
   min-height: auto;
 }
 
+.quick-capture {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.quick-capture-toggle {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.quick-capture h2,
+.quick-capture p {
+  margin: 0;
+}
+
+.quick-capture label {
+  display: grid;
+  gap: 5px;
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.quick-capture input,
+.quick-capture select,
+.quick-capture textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #c9d4cb;
+  border-radius: 8px;
+  font: inherit;
+}
+
+.quick-capture textarea {
+  min-height: 64px;
+  resize: vertical;
+}
+
 .app__header {
   max-width: 760px;
 }

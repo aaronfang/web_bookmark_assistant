@@ -7,6 +7,7 @@ import { countIndependentBookmarks } from '../repositories/local-bookmark-reposi
 import { invalidateBookmarkSearchIndex } from '../search/bookmark-search';
 import { BookmarkSearch } from './BookmarkSearch';
 import { OptionsDashboard } from './OptionsDashboard';
+import { QuickCapture } from './QuickCapture';
 
 type Surface = 'popup' | 'sidepanel' | 'newtab' | 'options';
 
@@ -31,6 +32,7 @@ export function App({ surface }: AppProps) {
   const [stats, setStats] = useState<LibraryStats | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [bookmarkRevision, setBookmarkRevision] = useState(0);
+  const [showQuickCapture, setShowQuickCapture] = useState(surface === 'popup');
 
   useEffect(() => {
     let cancelled = false;
@@ -86,14 +88,26 @@ export function App({ surface }: AppProps) {
       {error ? <p className="status status--error">{error}</p> : null}
 
       {surface === 'sidepanel' && stats ? (
-        <BookmarkSearch revision={bookmarkRevision} />
+        <>
+          <button
+            type="button"
+            className="quick-capture-toggle"
+            onClick={() => setShowQuickCapture((visible) => !visible)}
+          >
+            {showQuickCapture ? '收起快速收藏' : '快速收藏当前页面'}
+          </button>
+          {showQuickCapture ? <QuickCapture /> : null}
+          <BookmarkSearch revision={bookmarkRevision} />
+        </>
       ) : null}
+
+      {surface === 'popup' ? <QuickCapture /> : null}
 
       {surface === 'options' ? (
         stats ? (
           <OptionsDashboard revision={bookmarkRevision} stats={stats} />
         ) : null
-      ) : (
+      ) : surface !== 'popup' ? (
         <>
           <section className="stats" aria-label="书签概况">
             <article>
@@ -127,7 +141,7 @@ export function App({ surface }: AppProps) {
             </ul>
           </section>
         </>
-      )}
+      ) : null}
     </main>
   );
 }
