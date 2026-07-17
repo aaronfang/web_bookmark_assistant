@@ -6,6 +6,7 @@ import { DuplicateBookmarkDetector } from './DuplicateBookmarkDetector';
 import { FolderMoveSuggestions } from './FolderMoveSuggestions';
 import { SnapshotExport } from './SnapshotExport';
 import { OperationHistory } from './OperationHistory';
+import { AiSettingsPanel } from './AiSettingsPanel';
 
 type DashboardSection =
   | 'overview'
@@ -14,7 +15,8 @@ type DashboardSection =
   | 'health'
   | 'suggestions'
   | 'history'
-  | 'backup';
+  | 'backup'
+  | 'ai';
 
 interface OptionsDashboardProps {
   stats: {
@@ -33,6 +35,7 @@ const validSections = new Set<DashboardSection>([
   'suggestions',
   'history',
   'backup',
+  'ai',
 ]);
 
 function sectionFromHash(hash: string): DashboardSection {
@@ -67,7 +70,10 @@ const navigationGroups: Array<{
   },
   {
     label: '数据',
-    items: [{ id: 'backup', label: '备份与恢复' }],
+    items: [
+      { id: 'backup', label: '备份与恢复' },
+      { id: 'ai', label: 'AI 设置' },
+    ],
   },
 ];
 
@@ -142,6 +148,9 @@ export function OptionsDashboard({ stats, revision }: OptionsDashboardProps) {
       break;
     case 'history':
       panel = <OperationHistory revision={revision} />;
+      break;
+    case 'ai':
+      panel = <AiSettingsPanel />;
       break;
     case 'backup':
       panel = <SnapshotExport />;
