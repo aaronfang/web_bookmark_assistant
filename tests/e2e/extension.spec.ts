@@ -78,6 +78,69 @@ test('loads fixture bookmarks in an isolated Chrome profile', async () => {
     ).toBeVisible();
     await expect(page.getByRole('link', { name: /MDN/ })).toBeVisible();
 
+    const aiSuggestionBookmarkId = await serviceWorker.evaluate(async () => {
+      const [bookmark] = await chrome.bookmarks.search({ title: 'Example' });
+      return `chrome:${bookmark!.id}`;
+    });
+    await page.evaluate(async (bookmarkId) => {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open('web-bookmark-assistant');
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      await new Promise<void>((resolve, reject) => {
+        const transaction = db.transaction('suggestions', 'readwrite');
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+        transaction.objectStore('suggestions').put({
+          id: 'ai-classification:e2e',
+          bookmarkId,
+          kind: 'add-tags',
+          status: 'pending',
+          confidence: 0.42,
+          explanation: '正文证据有限，需要人工确认。',
+          proposedChange: JSON.stringify({
+            contentType: 'article',
+            tags: ['AI', '开发'],
+            folderSuggestion: '技术 / AI',
+          }),
+          createdAt: '2026-07-18T12:00:00.000Z',
+        });
+      });
+      db.close();
+    }, aiSuggestionBookmarkId);
+    await dashboardNavigation.getByRole('link', { name: 'AI 待整理' }).click();
+    const aiInbox = page.locator('.ai-inbox');
+    await expect(
+      aiInbox.getByRole('heading', { name: 'AI 待整理箱' }),
+    ).toBeVisible();
+    await expect(aiInbox.getByText('42%')).toBeVisible();
+    await expect(
+      aiInbox.getByText('正文证据有限，需要人工确认。'),
+    ).toBeVisible();
+    await aiInbox.getByRole('button', { name: '应用标签' }).click();
+    await expect(aiInbox.getByText('0 条待确认')).toBeVisible();
+    const appliedTags = await page.evaluate(async (bookmarkId) => {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open('web-bookmark-assistant');
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      const bookmark = await new Promise<{ tags?: string[] } | undefined>(
+        (resolve, reject) => {
+          const request = db
+            .transaction('bookmarks', 'readonly')
+            .objectStore('bookmarks')
+            .get(bookmarkId);
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        },
+      );
+      db.close();
+      return bookmark?.tags ?? [];
+    }, aiSuggestionBookmarkId);
+    expect(appliedTags).toEqual(expect.arrayContaining(['AI', '开发']));
+
     await dashboardNavigation.getByRole('link', { name: '备份与恢复' }).click();
     await expect(page).toHaveURL(/options\.html#backup$/);
     const downloadPromise = page.waitForEvent('download');

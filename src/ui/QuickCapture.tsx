@@ -1,11 +1,17 @@
 import { useEffect, useState } from 'react';
 
+import { createConfiguredAiProvider } from '../ai/configured-provider';
+import type { ClassificationResult } from '../ai/provider';
+import { extractActiveTabMetadata } from '../content/page-metadata-client';
+import type { PageMetadata } from '../content/page-metadata';
 import { database } from '../db/database';
 import type { ReadingStatus } from '../domain/bookmark';
 import { upsertChromeBookmarkMirror } from '../repositories/chrome-bookmark-repository';
-import { extractActiveTabMetadata } from '../content/page-metadata-client';
-import type { PageMetadata } from '../content/page-metadata';
-import { createConfiguredAiProvider } from '../ai/configured-provider';
+import {
+  createAiClassificationSuggestion,
+  isLowAiConfidence,
+  mergeSuggestedTags,
+} from '../suggestions/ai-classification-suggestion';
 
 interface FolderOption {
   id: string;
@@ -51,6 +57,13 @@ export function QuickCapture() {
   const [aiBusy, setAiBusy] = useState(false);
   const [pageMetadata, setPageMetadata] =
     useState<PageMetadata>(emptyPageMetadata);
+  const [classification, setClassification] =
+    useState<ClassificationResult | null>(null);
+  const [classificationAccepted, setClassificationAccepted] = useState(false);
+  const clearClassification = (): void => {
+    setClassification(null);
+    setClassificationAccepted(false);
+  };
 
   useEffect(() => {
     void Promise.all([
@@ -72,6 +85,7 @@ export function QuickCapture() {
     try {
       const metadata = await extractActiveTabMetadata(tabId);
       setPageMetadata(metadata);
+      clearClassification();
       const text = [metadata.description, metadata.selectedText]
         .filter(Boolean)
         .join('\n\n');
@@ -105,15 +119,36 @@ export function QuickCapture() {
         url: url.trim(),
       });
       await upsertChromeBookmarkMirror(node);
-      await database.bookmarks.update(`chrome:${node.id}`, {
-        tags: tags
-          .split(',')
-          .map((tag) => tag.trim())
-          .filter(Boolean),
-        note: note.trim(),
-        readingStatus,
-      });
-      setStatus('已保存到 Chrome 书签。');
+      const bookmarkId = `chrome:${node.id}`;
+      await database.transaction(
+        'rw',
+        database.bookmarks,
+        database.suggestions,
+        async () => {
+          await database.bookmarks.update(bookmarkId, {
+            tags: tags
+              .split(',')
+              .map((tag) => tag.trim())
+              .filter(Boolean),
+            note: note.trim(),
+            readingStatus,
+          });
+          if (classification) {
+            await database.suggestions.put(
+              createAiClassificationSuggestion(
+                bookmarkId,
+                classification,
+                classificationAccepted,
+              ),
+            );
+          }
+        },
+      );
+      setStatus(
+        classification && !classificationAccepted
+          ? '已保存书签；未采用的分类建议已进入 AI 待整理箱。'
+          : '已保存到 Chrome 书签。',
+      );
     } catch (error) {
       setStatus(error instanceof Error ? error.message : '保存失败');
     } finally {
@@ -128,7 +163,17 @@ export function QuickCapture() {
       return;
     }
     setAiBusy(true);
+    clearClassification();
     try {
+      let metadata = pageMetadata;
+      if (tabId !== null) {
+        try {
+          metadata = await extractActiveTabMetadata(tabId);
+          setPageMetadata(metadata);
+        } catch {
+          // Classification can still use the title, URL and existing form data.
+        }
+      }
       const bookmarks = await database.bookmarks.toArray();
       const tagCounts = new Map<string, number>();
       for (const bookmark of bookmarks) {
@@ -146,16 +191,21 @@ export function QuickCapture() {
       const result = await provider.classify({
         title,
         url,
-        description: pageMetadata.description,
-        selectedText: [pageMetadata.selectedText, note.trim()]
+        description: metadata.description,
+        selectedText: [metadata.selectedText, note.trim()]
           .filter(Boolean)
           .join('\n\n'),
-        contentExcerpt: pageMetadata.contentExcerpt,
+        contentExcerpt: metadata.contentExcerpt,
         candidateTags,
         folderPath,
       });
-      setTags(result.tags.join(', '));
-      setStatus(`已生成分类建议：${result.contentType}`);
+      setClassification(result);
+      setClassificationAccepted(false);
+      setStatus(
+        isLowAiConfidence(result.confidence)
+          ? '分类建议置信度较低；保存书签后会进入 AI 待整理箱。'
+          : '已生成分类建议，请查看依据并确认是否采用。',
+      );
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'AI 建议生成失败。');
     } finally {
@@ -208,7 +258,10 @@ export function QuickCapture() {
         标题
         <input
           value={title}
-          onChange={(event) => setTitle(event.target.value)}
+          onChange={(event) => {
+            setTitle(event.target.value);
+            clearClassification();
+          }}
         />
       </label>
       <label>
@@ -216,14 +269,20 @@ export function QuickCapture() {
         <input
           type="url"
           value={url}
-          onChange={(event) => setUrl(event.target.value)}
+          onChange={(event) => {
+            setUrl(event.target.value);
+            clearClassification();
+          }}
         />
       </label>
       <label>
         文件夹
         <select
           value={folderId}
-          onChange={(event) => setFolderId(event.target.value)}
+          onChange={(event) => {
+            setFolderId(event.target.value);
+            clearClassification();
+          }}
         >
           {folders.map((folder) => (
             <option key={folder.id} value={folder.id}>
@@ -244,7 +303,10 @@ export function QuickCapture() {
         备注
         <textarea
           value={note}
-          onChange={(event) => setNote(event.target.value)}
+          onChange={(event) => {
+            setNote(event.target.value);
+            clearClassification();
+          }}
         />
       </label>
       <button
@@ -267,6 +329,58 @@ export function QuickCapture() {
       >
         {aiBusy ? '生成中…' : '生成 AI 标签建议'}
       </button>
+      {classification ? (
+        <section
+          className="quick-capture__ai-suggestion"
+          aria-label="AI 分类建议"
+        >
+          <header>
+            <strong>{classification.contentType}</strong>
+            <span
+              className={
+                isLowAiConfidence(classification.confidence)
+                  ? 'is-low-confidence'
+                  : undefined
+              }
+            >
+              {Math.round(
+                Math.min(1, Math.max(0, classification.confidence)) * 100,
+              )}
+              %
+            </span>
+          </header>
+          <p>{classification.explanation}</p>
+          {classification.tags.length > 0 ? (
+            <div className="ai-tag-list">
+              {classification.tags.map((tag) => (
+                <span key={tag}>{tag}</span>
+              ))}
+            </div>
+          ) : (
+            <small>Provider 没有给出足够可靠的标签。</small>
+          )}
+          {classification.folderSuggestion ? (
+            <small>文件夹建议：{classification.folderSuggestion}</small>
+          ) : null}
+          <button
+            type="button"
+            disabled={classification.tags.length === 0}
+            onClick={() => {
+              const existing = tags
+                .split(',')
+                .map((tag) => tag.trim())
+                .filter(Boolean);
+              setTags(
+                mergeSuggestedTags(existing, classification.tags).join(', '),
+              );
+              setClassificationAccepted(true);
+              setStatus('已采用 AI 标签；保存书签后会记录置信度和依据。');
+            }}
+          >
+            {classificationAccepted ? '已采用标签' : '采用这些标签'}
+          </button>
+        </section>
+      ) : null}
       <button
         type="button"
         disabled={aiBusy || !title.trim() || !url.trim()}

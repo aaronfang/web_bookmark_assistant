@@ -7,12 +7,14 @@ import { FolderMoveSuggestions } from './FolderMoveSuggestions';
 import { SnapshotExport } from './SnapshotExport';
 import { OperationHistory } from './OperationHistory';
 import { AiSettingsPanel } from './AiSettingsPanel';
+import { AiSuggestionInbox } from './AiSuggestionInbox';
 
 type DashboardSection =
   | 'overview'
   | 'folders'
   | 'duplicates'
   | 'health'
+  | 'ai-inbox'
   | 'suggestions'
   | 'history'
   | 'backup'
@@ -32,6 +34,7 @@ const validSections = new Set<DashboardSection>([
   'folders',
   'duplicates',
   'health',
+  'ai-inbox',
   'suggestions',
   'history',
   'backup',
@@ -64,6 +67,7 @@ const navigationGroups: Array<{
   {
     label: '整理',
     items: [
+      { id: 'ai-inbox', label: 'AI 待整理' },
       { id: 'suggestions', label: '整理建议' },
       { id: 'history', label: '操作历史' },
     ],
@@ -142,6 +146,9 @@ export function OptionsDashboard({ stats, revision }: OptionsDashboardProps) {
       break;
     case 'health':
       panel = <BookmarkHealthCheck revision={revision} />;
+      break;
+    case 'ai-inbox':
+      panel = <AiSuggestionInbox revision={revision} />;
       break;
     case 'suggestions':
       panel = <FolderMoveSuggestions revision={revision} />;

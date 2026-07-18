@@ -35,6 +35,7 @@ async function synchronize(): Promise<ChromeBookmarkSummary> {
     'rw',
     database.bookmarks,
     database.linkHealth,
+    database.suggestions,
     async () => {
       const existing = await database.bookmarks
         .where('source')
@@ -66,6 +67,16 @@ async function synchronize(): Promise<ChromeBookmarkSummary> {
         cachedHealth
           .filter((record) => !validIds.has(record.bookmarkId))
           .map((record) => record.bookmarkId),
+      );
+      const cachedSuggestions = await database.suggestions.toArray();
+      await database.suggestions.bulkDelete(
+        cachedSuggestions
+          .filter(
+            (suggestion) =>
+              suggestion.bookmarkId.startsWith('chrome:') &&
+              !validIds.has(suggestion.bookmarkId),
+          )
+          .map((suggestion) => suggestion.id),
       );
     },
   );
@@ -112,7 +123,7 @@ export async function refreshChromeBookmarkMirror(id: string): Promise<void> {
       await upsertChromeBookmarkMirror(node);
     }
   } catch {
-    await database.bookmarks.delete(`chrome:${id}`);
+    await removeChromeBookmarkMirrors([id]);
   }
 }
 
@@ -124,9 +135,11 @@ export async function removeChromeBookmarkMirrors(
     'rw',
     database.bookmarks,
     database.linkHealth,
+    database.suggestions,
     async () => {
       await database.bookmarks.bulkDelete(ids);
       await database.linkHealth.bulkDelete(ids);
+      await database.suggestions.where('bookmarkId').anyOf(ids).delete();
     },
   );
 }
