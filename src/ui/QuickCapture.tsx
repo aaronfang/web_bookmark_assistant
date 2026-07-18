@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { createConfiguredAiProvider } from '../ai/configured-provider';
 import type { ClassificationResult } from '../ai/provider';
@@ -12,11 +12,11 @@ import {
   isLowAiConfidence,
   mergeSuggestedTags,
 } from '../suggestions/ai-classification-suggestion';
-
-interface FolderOption {
-  id: string;
-  label: string;
-}
+import {
+  folderCandidatesForAi,
+  matchAiFolderSuggestion,
+  type BookmarkFolderCandidate,
+} from '../suggestions/ai-folder-match';
 
 const emptyPageMetadata: PageMetadata = {
   description: '',
@@ -26,8 +26,8 @@ const emptyPageMetadata: PageMetadata = {
 
 function folderOptions(
   nodes: readonly chrome.bookmarks.BookmarkTreeNode[],
-): FolderOption[] {
-  const options: FolderOption[] = [];
+): BookmarkFolderCandidate[] {
+  const options: BookmarkFolderCandidate[] = [];
   const visit = (
     node: chrome.bookmarks.BookmarkTreeNode,
     path: string[],
@@ -36,7 +36,7 @@ function folderOptions(
     const next =
       node.parentId === undefined ? path : [...path, node.title || '未命名'];
     if (node.parentId !== undefined)
-      options.push({ id: node.id, label: next.join(' / ') });
+      options.push({ id: node.id, label: next.join(' / '), path: next });
     node.children?.forEach((child) => visit(child, next));
   };
   nodes.forEach((node) => visit(node, []));
@@ -47,7 +47,7 @@ export function QuickCapture() {
   const [title, setTitle] = useState('');
   const [url, setUrl] = useState('');
   const [folderId, setFolderId] = useState('');
-  const [folders, setFolders] = useState<FolderOption[]>([]);
+  const [folders, setFolders] = useState<BookmarkFolderCandidate[]>([]);
   const [tags, setTags] = useState('');
   const [note, setNote] = useState('');
   const [readingStatus, setReadingStatus] = useState<ReadingStatus>('inbox');
@@ -64,6 +64,17 @@ export function QuickCapture() {
     setClassification(null);
     setClassificationAccepted(false);
   };
+  const matchedFolder = useMemo(
+    () =>
+      classification?.folderSuggestion
+        ? matchAiFolderSuggestion(classification.folderSuggestion, folders)
+        : null,
+    [classification, folders],
+  );
+  const classificationFullyAccepted =
+    classification !== null &&
+    (classification.tags.length === 0 || classificationAccepted) &&
+    (!classification.folderSuggestion || matchedFolder?.folder.id === folderId);
 
   useEffect(() => {
     void Promise.all([
@@ -138,14 +149,14 @@ export function QuickCapture() {
               createAiClassificationSuggestion(
                 bookmarkId,
                 classification,
-                classificationAccepted,
+                classificationFullyAccepted,
               ),
             );
           }
         },
       );
       setStatus(
-        classification && !classificationAccepted
+        classification && !classificationFullyAccepted
           ? '已保存书签；未采用的分类建议已进入 AI 待整理箱。'
           : '已保存到 Chrome 书签。',
       );
@@ -197,6 +208,7 @@ export function QuickCapture() {
           .join('\n\n'),
         contentExcerpt: metadata.contentExcerpt,
         candidateTags,
+        candidateFolders: folderCandidatesForAi(folders, folderId),
         folderPath,
       });
       setClassification(result);
@@ -360,7 +372,29 @@ export function QuickCapture() {
             <small>Provider 没有给出足够可靠的标签。</small>
           )}
           {classification.folderSuggestion ? (
-            <small>文件夹建议：{classification.folderSuggestion}</small>
+            matchedFolder ? (
+              <div className="quick-capture__folder-suggestion">
+                <small>建议保存到：{matchedFolder.folder.label}</small>
+                <button
+                  type="button"
+                  disabled={matchedFolder.folder.id === folderId}
+                  onClick={() => {
+                    setFolderId(matchedFolder.folder.id);
+                    setStatus(
+                      '已采用现有文件夹建议；保存前仍可在上方手动调整。',
+                    );
+                  }}
+                >
+                  {matchedFolder.folder.id === folderId
+                    ? '已选择此文件夹'
+                    : '采用文件夹建议'}
+                </button>
+              </div>
+            ) : (
+              <small>
+                {`文件夹建议“${classification.folderSuggestion}”未能唯一匹配现有目录，不会创建或切换文件夹。`}
+              </small>
+            )
           ) : null}
           <button
             type="button"

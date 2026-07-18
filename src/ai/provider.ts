@@ -5,6 +5,7 @@ export interface ContentInput {
   selectedText?: string;
   contentExcerpt?: string;
   candidateTags?: string[];
+  candidateFolders?: string[];
   folderPath?: string[];
 }
 

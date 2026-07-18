@@ -45,25 +45,30 @@ export class OpenAiCompatibleProvider implements AiProvider {
 
   async classify(input: ContentInput): Promise<ClassificationResult> {
     const response = await this.complete(
-      `Classify this bookmark as JSON with keys contentType, tags (array), folderSuggestion, confidence (0-1), explanation. Return 1-3 concise tags, prefer existing tags when relevant, avoid synonyms and generic tags, and return an empty array if evidence is insufficient.\nExisting tags: ${(input.candidateTags ?? []).join(', ')}\nCurrent folder: ${(input.folderPath ?? []).join(' / ')}\nTitle: ${input.title}\nURL: ${input.url}\nDescription: ${input.description ?? ''}\nSelected text: ${input.selectedText ?? ''}\nPage excerpt: ${input.contentExcerpt ?? ''}`,
+      `Classify this bookmark as JSON with keys contentType, tags (array), folderSuggestion, confidence (0-1), explanation. Return 1-3 concise tags, prefer existing tags when relevant, avoid synonyms and generic tags, and return an empty array if evidence is insufficient. folderSuggestion must exactly equal one path from Existing folders; return an empty string when none is suitable.\nExisting tags: ${(input.candidateTags ?? []).join(', ')}\nExisting folders:\n${(input.candidateFolders ?? []).join('\n')}\nCurrent folder: ${(input.folderPath ?? []).join(' / ')}\nTitle: ${input.title}\nURL: ${input.url}\nDescription: ${input.description ?? ''}\nSelected text: ${input.selectedText ?? ''}\nPage excerpt: ${input.contentExcerpt ?? ''}`,
     );
     try {
       const parsed = JSON.parse(
         extractModelJsonObject(response),
       ) as Partial<ClassificationResult>;
       return {
-        contentType: parsed.contentType ?? 'unknown',
+        contentType:
+          typeof parsed.contentType === 'string'
+            ? parsed.contentType
+            : 'unknown',
         tags: Array.isArray(parsed.tags)
           ? parsed.tags.filter((tag): tag is string => typeof tag === 'string')
           : [],
-        ...(parsed.folderSuggestion
+        ...(typeof parsed.folderSuggestion === 'string' &&
+        parsed.folderSuggestion.trim()
           ? { folderSuggestion: parsed.folderSuggestion }
           : {}),
         confidence:
           typeof parsed.confidence === 'number' ? parsed.confidence : 0.25,
         explanation:
-          parsed.explanation ??
-          'Provider returned an incomplete classification.',
+          typeof parsed.explanation === 'string'
+            ? parsed.explanation
+            : 'Provider returned an incomplete classification.',
       };
     } catch {
       throw new Error(

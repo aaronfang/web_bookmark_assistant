@@ -164,6 +164,17 @@ body {
   line-height: 1.5;
 }
 
+.quick-capture__folder-suggestion {
+  display: grid;
+  gap: 7px;
+  border-top: 1px solid #dce5dd;
+  padding-top: 9px;
+}
+
+.quick-capture__folder-suggestion button {
+  width: 100%;
+}
+
 .ai-tag-list {
   display: flex;
   flex-wrap: wrap;

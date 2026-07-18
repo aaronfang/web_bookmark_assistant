@@ -384,6 +384,64 @@ test('loads fixture bookmarks in an isolated Chrome profile', async () => {
     await expect(
       page.getByRole('link', { name: /Live Event Renamed/ }),
     ).toHaveCount(0);
+
+    const fixtureFolderId = await serviceWorker.evaluate(async () => {
+      const [folder] = await chrome.bookmarks.search({
+        title: 'Phase 0 fixture',
+      });
+      return folder!.id;
+    });
+    await page.evaluate(() => {
+      localStorage.setItem(
+        'wba-ai-settings',
+        JSON.stringify({
+          provider: 'openai-compatible',
+          baseUrl: 'https://api.example.com/v1',
+          apiKey: 'e2e-key',
+          model: 'e2e-model',
+          excludedDomains: [],
+        }),
+      );
+    });
+    let classificationPrompt = '';
+    await page.route(
+      'https://api.example.com/v1/chat/completions',
+      async (route) => {
+        const request = route.request().postDataJSON() as {
+          messages?: Array<{ content?: string }>;
+        };
+        classificationPrompt = request.messages?.[0]?.content ?? '';
+        await route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    contentType: 'article',
+                    tags: ['AI'],
+                    folderSuggestion: 'Phase 0 fixture',
+                    confidence: 0.88,
+                    explanation: '与现有技术收藏目录匹配。',
+                  }),
+                },
+              },
+            ],
+          }),
+        });
+      },
+    );
+    await page.goto(`chrome-extension://${extensionId}/popup.html`);
+    await page.getByLabel('标题').fill('AI folder match fixture');
+    await page.getByLabel('网址').fill('https://example.com/ai-folder-match');
+    await page.getByRole('button', { name: '生成 AI 标签建议' }).click();
+    await expect(
+      page.getByText('建议保存到：', { exact: false }),
+    ).toContainText('Phase 0 fixture');
+    await page.getByRole('button', { name: '采用文件夹建议' }).click();
+    await expect(page.getByLabel('文件夹')).toHaveValue(fixtureFolderId);
+    expect(classificationPrompt).toContain('Existing folders:');
+    expect(classificationPrompt).toContain('Phase 0 fixture');
   } finally {
     await context.close();
     await rm(profilePath, { force: true, recursive: true });

@@ -42,7 +42,11 @@ describe('OllamaProvider', () => {
       fetcher,
     );
     await expect(
-      provider.classify({ title: 'Example', url: 'https://example.com' }),
+      provider.classify({
+        title: 'Example',
+        url: 'https://example.com',
+        candidateFolders: ['书签栏 / 技术 / AI', '书签栏 / 阅读'],
+      }),
     ).rejects.toThrow('not valid JSON');
   });
 
@@ -98,7 +102,11 @@ describe('OllamaProvider', () => {
       fetcher,
     );
     await expect(
-      provider.classify({ title: 'Example', url: 'https://example.com' }),
+      provider.classify({
+        title: 'Example',
+        url: 'https://example.com',
+        candidateFolders: ['书签栏 / 技术 / AI', '书签栏 / 阅读'],
+      }),
     ).resolves.toMatchObject({
       contentType: 'article',
       tags: ['AI'],
@@ -109,5 +117,8 @@ describe('OllamaProvider', () => {
       format: 'json',
       options: { temperature: 0.1 },
     });
+    expect(String(JSON.parse(String(request?.body)).prompt)).toContain(
+      'Existing folders:\n书签栏 / 技术 / AI\n书签栏 / 阅读',
+    );
   });
 });
