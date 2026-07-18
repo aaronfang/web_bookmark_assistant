@@ -112,10 +112,26 @@ export function QuickCapture() {
     }
     setAiBusy(true);
     try {
+      const bookmarks = await database.bookmarks.toArray();
+      const tagCounts = new Map<string, number>();
+      for (const bookmark of bookmarks) {
+        for (const tag of bookmark.tags) {
+          tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
+        }
+      }
+      const candidateTags = [...tagCounts]
+        .sort((left, right) => right[1] - left[1])
+        .slice(0, 30)
+        .map(([tag]) => tag);
+      const folderPath =
+        folders.find((folder) => folder.id === folderId)?.label.split(' / ') ??
+        [];
       const result = await provider.classify({
         title,
         url,
         selectedText: note,
+        candidateTags,
+        folderPath,
       });
       setTags(result.tags.join(', '));
       setStatus(`已生成分类建议：${result.contentType}`);

@@ -20,7 +20,7 @@ function promptForSummary(input: ContentInput): string {
 }
 
 function promptForClassification(input: ContentInput): string {
-  return `Classify this bookmark. Return only one JSON object without markdown or reasoning, with keys contentType, tags (array), folderSuggestion, confidence (0-1), explanation.\nTitle: ${input.title}\nURL: ${input.url}\nDescription: ${input.description ?? ''}\nSelected text: ${input.selectedText ?? ''}`;
+  return `/no_think\nClassify this bookmark. Return only one JSON object without markdown or reasoning, with keys contentType, tags (array), folderSuggestion, confidence (0-1), explanation. Return 1-3 concise tags, prefer the existing tags when relevant, avoid synonyms and generic tags such as website/article/content, and return an empty array if evidence is insufficient.\nExisting tags: ${(input.candidateTags ?? []).join(', ')}\nCurrent folder: ${(input.folderPath ?? []).join(' / ')}\nTitle: ${input.title}\nURL: ${input.url}\nDescription: ${input.description ?? ''}\nSelected text: ${input.selectedText ?? ''}`;
 }
 
 function extractJsonObject(text: string): string {
@@ -59,7 +59,7 @@ export class OllamaProvider implements AiProvider {
   }
 
   async classify(input: ContentInput): Promise<ClassificationResult> {
-    const text = await this.generate(promptForClassification(input));
+    const text = await this.generate(promptForClassification(input), true);
     try {
       const parsed = JSON.parse(
         extractJsonObject(text),
@@ -82,7 +82,7 @@ export class OllamaProvider implements AiProvider {
     }
   }
 
-  private async generate(prompt: string): Promise<string> {
+  private async generate(prompt: string, structured = false): Promise<string> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.config.timeoutMs);
     try {
@@ -95,6 +95,8 @@ export class OllamaProvider implements AiProvider {
             model: this.config.model,
             prompt,
             stream: false,
+            ...(structured ? { format: 'json' } : {}),
+            options: { temperature: structured ? 0.1 : 0.2 },
           }),
           signal: controller.signal,
         },

@@ -39,7 +39,7 @@ export class OpenAiCompatibleProvider implements AiProvider {
 
   async classify(input: ContentInput): Promise<ClassificationResult> {
     const response = await this.complete(
-      `Classify this bookmark as JSON with keys contentType, tags (array), folderSuggestion, confidence (0-1), explanation.\nTitle: ${input.title}\nURL: ${input.url}\nDescription: ${input.description ?? ''}\nSelected text: ${input.selectedText ?? ''}`,
+      `Classify this bookmark as JSON with keys contentType, tags (array), folderSuggestion, confidence (0-1), explanation. Return 1-3 concise tags, prefer existing tags when relevant, avoid synonyms and generic tags, and return an empty array if evidence is insufficient.\nExisting tags: ${(input.candidateTags ?? []).join(', ')}\nCurrent folder: ${(input.folderPath ?? []).join(' / ')}\nTitle: ${input.title}\nURL: ${input.url}\nDescription: ${input.description ?? ''}\nSelected text: ${input.selectedText ?? ''}`,
     );
     try {
       const parsed = JSON.parse(response) as Partial<ClassificationResult>;
@@ -79,7 +79,7 @@ export class OpenAiCompatibleProvider implements AiProvider {
           body: JSON.stringify({
             model: this.config.model,
             messages: [{ role: 'user', content: prompt }],
-            temperature: 0.2,
+            temperature: 0.1,
           }),
           signal: controller.signal,
         },

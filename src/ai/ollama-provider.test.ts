@@ -56,5 +56,10 @@ describe('OllamaProvider', () => {
       tags: ['AI'],
       confidence: 0.9,
     });
+    const request = fetcher.mock.calls[0]?.[1];
+    expect(JSON.parse(String(request?.body))).toMatchObject({
+      format: 'json',
+      options: { temperature: 0.1 },
+    });
   });
 });

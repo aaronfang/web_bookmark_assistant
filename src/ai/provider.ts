@@ -3,6 +3,8 @@ export interface ContentInput {
   url: string;
   description?: string;
   selectedText?: string;
+  candidateTags?: string[];
+  folderPath?: string[];
 }
 
 export interface SummaryResult {
