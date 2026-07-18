@@ -20,7 +20,20 @@ function promptForSummary(input: ContentInput): string {
 }
 
 function promptForClassification(input: ContentInput): string {
-  return `Classify this bookmark as JSON with keys contentType, tags (array), folderSuggestion, confidence (0-1), explanation.\nTitle: ${input.title}\nURL: ${input.url}\nDescription: ${input.description ?? ''}\nSelected text: ${input.selectedText ?? ''}`;
+  return `Classify this bookmark. Return only one JSON object without markdown or reasoning, with keys contentType, tags (array), folderSuggestion, confidence (0-1), explanation.\nTitle: ${input.title}\nURL: ${input.url}\nDescription: ${input.description ?? ''}\nSelected text: ${input.selectedText ?? ''}`;
+}
+
+function extractJsonObject(text: string): string {
+  const withoutThinking = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+  const fenced = withoutThinking
+    .match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1]
+    ?.trim();
+  const candidate = fenced ?? withoutThinking;
+  const start = candidate.indexOf('{');
+  const end = candidate.lastIndexOf('}');
+  if (start < 0 || end <= start)
+    throw new Error('Ollama classification response was not valid JSON');
+  return candidate.slice(start, end + 1);
 }
 
 export class OllamaProvider implements AiProvider {
@@ -48,7 +61,9 @@ export class OllamaProvider implements AiProvider {
   async classify(input: ContentInput): Promise<ClassificationResult> {
     const text = await this.generate(promptForClassification(input));
     try {
-      const parsed = JSON.parse(text) as Partial<ClassificationResult>;
+      const parsed = JSON.parse(
+        extractJsonObject(text),
+      ) as Partial<ClassificationResult>;
       return {
         contentType: parsed.contentType ?? 'unknown',
         tags: Array.isArray(parsed.tags)
