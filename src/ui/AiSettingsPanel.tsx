@@ -10,6 +10,7 @@ interface AiSettings {
   baseUrl: string;
   model: string;
   apiKey: string;
+  excludedDomains: string[];
 }
 
 const defaults: AiSettings = {
@@ -17,6 +18,7 @@ const defaults: AiSettings = {
   baseUrl: 'http://127.0.0.1:11434',
   model: 'llama3',
   apiKey: '',
+  excludedDomains: [],
 };
 
 function loadSettings(): AiSettings {
@@ -104,6 +106,24 @@ export function AiSettingsPanel() {
           />
         </label>
       ) : null}
+      <label>
+        AI 排除域名
+        <textarea
+          value={settings.excludedDomains.join('\n')}
+          placeholder={'例如：\nmail.example.com\ncompany.internal'}
+          onChange={(event) =>
+            update({
+              excludedDomains: event.target.value
+                .split(/[\n,]/)
+                .map((domain) => domain.trim())
+                .filter(Boolean),
+            })
+          }
+        />
+        <small>
+          每行一个域名；其子域名也会被排除。匹配时不会发起 AI 请求。
+        </small>
+      </label>
       <label>
         模型
         <input
