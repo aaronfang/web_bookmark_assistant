@@ -73,6 +73,52 @@ body {
   font: inherit;
 }
 
+.ai-settings {
+  display: grid;
+  max-width: 760px;
+  gap: 18px;
+}
+
+.ai-settings > label {
+  display: grid;
+  gap: 7px;
+  color: #33483d;
+  font-weight: 650;
+}
+
+.ai-settings input,
+.ai-settings select,
+.ai-settings textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #b8c6bb;
+  border-radius: 9px;
+  background: #fff;
+  color: #13211a;
+  font: inherit;
+}
+
+.ai-settings textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
+.ai-settings small {
+  color: #607268;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.ai-settings > .notice {
+  margin: 0;
+}
+
+.ai-settings > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .quick-capture textarea {
   min-height: 64px;
   resize: vertical;
