@@ -4,6 +4,7 @@ import { database } from '../db/database';
 import type { ReadingStatus } from '../domain/bookmark';
 import { upsertChromeBookmarkMirror } from '../repositories/chrome-bookmark-repository';
 import { extractActiveTabMetadata } from '../content/page-metadata-client';
+import { createConfiguredAiProvider } from '../ai/configured-provider';
 
 interface FolderOption {
   id: string;
@@ -40,6 +41,7 @@ export function QuickCapture() {
   const [status, setStatus] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [tabId, setTabId] = useState<number | null>(null);
+  const [aiBusy, setAiBusy] = useState(false);
 
   useEffect(() => {
     void Promise.all([
@@ -102,6 +104,28 @@ export function QuickCapture() {
     }
   };
 
+  const generateSuggestions = async (): Promise<void> => {
+    const provider = createConfiguredAiProvider();
+    if (!provider) {
+      setStatus('AI 当前已禁用，请先在管理页的 AI 设置中启用 Provider。');
+      return;
+    }
+    setAiBusy(true);
+    try {
+      const result = await provider.classify({
+        title,
+        url,
+        selectedText: note,
+      });
+      setTags(result.tags.join(', '));
+      setStatus(`已生成分类建议：${result.contentType}`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'AI 建议生成失败。');
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
   return (
     <section className="quick-capture" aria-labelledby="quick-capture-title">
       <h2 id="quick-capture-title">保存当前页面</h2>
@@ -154,6 +178,13 @@ export function QuickCapture() {
         disabled={tabId === null}
       >
         读取页面描述/选中文本
+      </button>
+      <button
+        type="button"
+        disabled={aiBusy || !title.trim() || !url.trim()}
+        onClick={() => void generateSuggestions()}
+      >
+        {aiBusy ? '生成中…' : '生成 AI 标签建议'}
       </button>
       <label>
         阅读状态
