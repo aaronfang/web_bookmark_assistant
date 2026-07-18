@@ -8,6 +8,7 @@ import { invalidateBookmarkSearchIndex } from '../search/bookmark-search';
 import { BookmarkSearch } from './BookmarkSearch';
 import { OptionsDashboard } from './OptionsDashboard';
 import { QuickCapture } from './QuickCapture';
+import { DailyReview } from './DailyReview';
 
 type Surface = 'popup' | 'sidepanel' | 'newtab' | 'options';
 
@@ -102,6 +103,7 @@ export function App({ surface }: AppProps) {
       ) : null}
 
       {surface === 'popup' ? <QuickCapture /> : null}
+      {surface === 'newtab' ? <DailyReview /> : null}
 
       {surface === 'options' ? (
         stats ? (
