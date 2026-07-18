@@ -10,6 +10,11 @@ export interface AiFolderMatch {
   confidence: number;
 }
 
+export interface NewBookmarkFolderProposal {
+  name: string;
+  parent: BookmarkFolderCandidate;
+}
+
 function normalizeSegment(value: string): string {
   return value
     .normalize('NFKC')
@@ -25,6 +30,31 @@ function suggestionSegments(value: string): string[] {
     .split(/\s*(?:\/|\\|>|→)\s*/)
     .map(normalizeSegment)
     .filter(Boolean);
+}
+
+function displaySuggestionSegments(value: string): string[] {
+  return value
+    .replace(/^\s*(?:文件夹建议|folder suggestion)\s*[:：]\s*/i, '')
+    .replace(/^[`'“”"]+|[`'“”"]+$/g, '')
+    .split(/\s*(?:\/|\\|>|→)\s*/)
+    .map((segment) => segment.normalize('NFKC').replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+}
+
+export function isValidNewFolderName(value: string): boolean {
+  const name = value.normalize('NFKC').trim();
+  const hasControlCharacter = [...name].some(
+    (character) => character.charCodeAt(0) < 32,
+  );
+  return (
+    name.length > 0 &&
+    name.length <= 80 &&
+    name !== '.' &&
+    name !== '..' &&
+    !hasControlCharacter &&
+    !name.includes('/') &&
+    !name.includes('\\')
+  );
 }
 
 function normalizedPath(folder: BookmarkFolderCandidate): string[] {
@@ -64,6 +94,27 @@ export function matchAiFolderSuggestion(
     kind: 'unique-suffix',
     confidence: segments.length > 1 ? 0.9 : 0.8,
   };
+}
+
+export function buildNewFolderProposal(
+  suggestion: string,
+  folders: readonly BookmarkFolderCandidate[],
+  currentFolderId: string,
+): NewBookmarkFolderProposal | null {
+  if (matchAiFolderSuggestion(suggestion, folders)) return null;
+  const segments = displaySuggestionSegments(suggestion);
+  const name = segments.at(-1) ?? '';
+  if (!isValidNewFolderName(name)) return null;
+
+  let parent = folders.find(({ id }) => id === currentFolderId);
+  if (segments.length > 1) {
+    const parentMatch = matchAiFolderSuggestion(
+      segments.slice(0, -1).join(' / '),
+      folders,
+    );
+    if (parentMatch) parent = parentMatch.folder;
+  }
+  return parent ? { name, parent } : null;
 }
 
 export function folderCandidatesForAi(

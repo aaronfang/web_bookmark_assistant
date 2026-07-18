@@ -404,6 +404,7 @@ test('loads fixture bookmarks in an isolated Chrome profile', async () => {
       );
     });
     let classificationPrompt = '';
+    let returnedFolderSuggestion = 'Phase 0 fixture';
     await page.route(
       'https://api.example.com/v1/chat/completions',
       async (route) => {
@@ -420,7 +421,7 @@ test('loads fixture bookmarks in an isolated Chrome profile', async () => {
                   content: JSON.stringify({
                     contentType: 'article',
                     tags: ['AI'],
-                    folderSuggestion: 'Phase 0 fixture',
+                    folderSuggestion: returnedFolderSuggestion,
                     confidence: 0.88,
                     explanation: '与现有技术收藏目录匹配。',
                   }),
@@ -442,6 +443,37 @@ test('loads fixture bookmarks in an isolated Chrome profile', async () => {
     await expect(page.getByLabel('文件夹')).toHaveValue(fixtureFolderId);
     expect(classificationPrompt).toContain('Existing folders:');
     expect(classificationPrompt).toContain('Phase 0 fixture');
+
+    returnedFolderSuggestion = 'Phase 0 fixture / AI 新分类';
+    await page.getByLabel('标题').fill('AI new folder fixture');
+    await page.getByLabel('网址').fill('https://example.com/ai-new-folder');
+    await page.getByRole('button', { name: '生成 AI 标签建议' }).click();
+    await expect(page.getByText('建议新建文件夹')).toBeVisible();
+    await expect(page.getByLabel('名称')).toHaveValue('AI 新分类');
+    await expect(page.getByLabel('父目录')).toHaveValue(fixtureFolderId);
+    await page.getByRole('button', { name: '确认新建并采用' }).click();
+    await page.getByRole('button', { name: '保存书签' }).click();
+    await expect(page.getByText('已保存书签', { exact: false })).toBeVisible();
+    const createdFolderResult = await serviceWorker.evaluate(async () => {
+      const folders = await chrome.bookmarks.search({ title: 'AI 新分类' });
+      const bookmarks = await chrome.bookmarks.search({
+        title: 'AI new folder fixture',
+      });
+      return {
+        folderId: folders[0]?.id,
+        folderParentId: folders[0]?.parentId,
+        bookmarkId: bookmarks[0]?.id,
+        bookmarkParentId: bookmarks[0]?.parentId,
+      };
+    });
+    expect(createdFolderResult.folderParentId).toBe(fixtureFolderId);
+    expect(createdFolderResult.bookmarkParentId).toBe(
+      createdFolderResult.folderId,
+    );
+    await serviceWorker.evaluate(async ({ bookmarkId, folderId }) => {
+      if (bookmarkId) await chrome.bookmarks.remove(bookmarkId);
+      if (folderId) await chrome.bookmarks.remove(folderId);
+    }, createdFolderResult);
   } finally {
     await context.close();
     await rm(profilePath, { force: true, recursive: true });

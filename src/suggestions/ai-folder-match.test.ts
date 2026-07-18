@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildNewFolderProposal,
   folderCandidatesForAi,
+  isValidNewFolderName,
   matchAiFolderSuggestion,
   type BookmarkFolderCandidate,
 } from './ai-folder-match';
@@ -10,6 +12,7 @@ const folders: BookmarkFolderCandidate[] = [
   { id: '1', label: '书签栏 / 技术 / AI', path: ['书签栏', '技术', 'AI'] },
   { id: '2', label: '书签栏 / 阅读', path: ['书签栏', '阅读'] },
   { id: '3', label: '其他书签 / 阅读', path: ['其他书签', '阅读'] },
+  { id: '4', label: '书签栏 / 技术', path: ['书签栏', '技术'] },
 ];
 
 describe('matchAiFolderSuggestion', () => {
@@ -41,5 +44,27 @@ describe('folderCandidatesForAi', () => {
       '书签栏 / 技术 / AI',
       '其他书签 / 阅读',
     ]);
+  });
+});
+
+describe('buildNewFolderProposal', () => {
+  it('proposes one new child under a matched existing parent', () => {
+    expect(
+      buildNewFolderProposal('书签栏 / 技术 / 前端', folders, '2'),
+    ).toEqual({ name: '前端', parent: folders[3] });
+  });
+
+  it('uses the confirmed current folder when only a new name is returned', () => {
+    expect(buildNewFolderProposal('稍后研究', folders, '2')).toEqual({
+      name: '稍后研究',
+      parent: folders[1],
+    });
+  });
+
+  it('does not propose an already existing or invalid folder', () => {
+    expect(buildNewFolderProposal('技术 / AI', folders, '2')).toBeNull();
+    expect(isValidNewFolderName('..')).toBe(false);
+    expect(isValidNewFolderName('a/b')).toBe(false);
+    expect(isValidNewFolderName('a'.repeat(81))).toBe(false);
   });
 });

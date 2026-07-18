@@ -2,6 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { createConfiguredAiProvider } from '../ai/configured-provider';
 import type { ClassificationResult } from '../ai/provider';
+import {
+  removeCreatedFolderIfEmpty,
+  resolveOrCreateBookmarkFolder,
+  type ResolvedBookmarkFolder,
+} from '../chrome/bookmark-folder-creator';
 import { extractActiveTabMetadata } from '../content/page-metadata-client';
 import type { PageMetadata } from '../content/page-metadata';
 import { database } from '../db/database';
@@ -13,7 +18,9 @@ import {
   mergeSuggestedTags,
 } from '../suggestions/ai-classification-suggestion';
 import {
+  buildNewFolderProposal,
   folderCandidatesForAi,
+  isValidNewFolderName,
   matchAiFolderSuggestion,
   type BookmarkFolderCandidate,
 } from '../suggestions/ai-folder-match';
@@ -60,9 +67,15 @@ export function QuickCapture() {
   const [classification, setClassification] =
     useState<ClassificationResult | null>(null);
   const [classificationAccepted, setClassificationAccepted] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [newFolderParentId, setNewFolderParentId] = useState('');
+  const [newFolderAccepted, setNewFolderAccepted] = useState(false);
   const clearClassification = (): void => {
     setClassification(null);
     setClassificationAccepted(false);
+    setNewFolderName('');
+    setNewFolderParentId('');
+    setNewFolderAccepted(false);
   };
   const matchedFolder = useMemo(
     () =>
@@ -71,10 +84,23 @@ export function QuickCapture() {
         : null,
     [classification, folders],
   );
+  const newFolderProposal = useMemo(
+    () =>
+      classification?.folderSuggestion && !matchedFolder
+        ? buildNewFolderProposal(
+            classification.folderSuggestion,
+            folders,
+            folderId,
+          )
+        : null,
+    [classification, matchedFolder, folders, folderId],
+  );
   const classificationFullyAccepted =
     classification !== null &&
     (classification.tags.length === 0 || classificationAccepted) &&
-    (!classification.folderSuggestion || matchedFolder?.folder.id === folderId);
+    (!classification.folderSuggestion ||
+      matchedFolder?.folder.id === folderId ||
+      newFolderAccepted);
 
   useEffect(() => {
     void Promise.all([
@@ -123,12 +149,23 @@ export function QuickCapture() {
     if (!title.trim() || !url.trim() || !folderId || saving) return;
     setSaving(true);
     setStatus(null);
+    let resolvedFolder: ResolvedBookmarkFolder | null = null;
+    let createdBookmarkId: string | null = null;
     try {
+      let targetFolderId = folderId;
+      if (newFolderAccepted) {
+        resolvedFolder = await resolveOrCreateBookmarkFolder(
+          newFolderParentId,
+          newFolderName,
+        );
+        targetFolderId = resolvedFolder.folder.id;
+      }
       const node = await chrome.bookmarks.create({
-        parentId: folderId,
+        parentId: targetFolderId,
         title: title.trim(),
         url: url.trim(),
       });
+      createdBookmarkId = node.id;
       await upsertChromeBookmarkMirror(node);
       const bookmarkId = `chrome:${node.id}`;
       await database.transaction(
@@ -161,6 +198,20 @@ export function QuickCapture() {
           : '已保存到 Chrome 书签。',
       );
     } catch (error) {
+      if (resolvedFolder?.created) {
+        if (createdBookmarkId) {
+          try {
+            await chrome.bookmarks.remove(createdBookmarkId);
+          } catch {
+            // The bookmark may already have been removed by Chrome.
+          }
+        }
+        try {
+          await removeCreatedFolderIfEmpty(resolvedFolder);
+        } catch {
+          // Keep the original error; a non-empty folder is never removed.
+        }
+      }
       setStatus(error instanceof Error ? error.message : '保存失败');
     } finally {
       setSaving(false);
@@ -211,8 +262,14 @@ export function QuickCapture() {
         candidateFolders: folderCandidatesForAi(folders, folderId),
         folderPath,
       });
+      const proposedFolder = result.folderSuggestion
+        ? buildNewFolderProposal(result.folderSuggestion, folders, folderId)
+        : null;
       setClassification(result);
       setClassificationAccepted(false);
+      setNewFolderName(proposedFolder?.name ?? '');
+      setNewFolderParentId(proposedFolder?.parent.id ?? folderId);
+      setNewFolderAccepted(false);
       setStatus(
         isLowAiConfidence(result.confidence)
           ? '分类建议置信度较低；保存书签后会进入 AI 待整理箱。'
@@ -391,9 +448,67 @@ export function QuickCapture() {
                 </button>
               </div>
             ) : (
-              <small>
-                {`文件夹建议“${classification.folderSuggestion}”未能唯一匹配现有目录，不会创建或切换文件夹。`}
-              </small>
+              <div className="quick-capture__folder-suggestion">
+                {isLowAiConfidence(classification.confidence) ? (
+                  <small>
+                    {`文件夹建议“${classification.folderSuggestion}”置信度较低，不提供创建入口。`}
+                  </small>
+                ) : newFolderProposal ? (
+                  <>
+                    <strong>建议新建文件夹</strong>
+                    <label>
+                      名称
+                      <input
+                        value={newFolderName}
+                        maxLength={80}
+                        onChange={(event) => {
+                          setNewFolderName(event.target.value);
+                          setNewFolderAccepted(false);
+                        }}
+                      />
+                    </label>
+                    <label>
+                      父目录
+                      <select
+                        value={newFolderParentId}
+                        onChange={(event) => {
+                          setNewFolderParentId(event.target.value);
+                          setNewFolderAccepted(false);
+                        }}
+                      >
+                        {folders.map((folder) => (
+                          <option key={folder.id} value={folder.id}>
+                            {folder.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <small>
+                      文件夹将在保存书签时创建；若已存在同名目录则直接复用。
+                    </small>
+                    <button
+                      type="button"
+                      disabled={
+                        newFolderAccepted ||
+                        !newFolderParentId ||
+                        !isValidNewFolderName(newFolderName)
+                      }
+                      onClick={() => {
+                        setNewFolderAccepted(true);
+                        setStatus(
+                          '已确认新文件夹计划；只有保存书签时才会创建。',
+                        );
+                      }}
+                    >
+                      {newFolderAccepted ? '已确认创建计划' : '确认新建并采用'}
+                    </button>
+                  </>
+                ) : (
+                  <small>
+                    {`文件夹建议“${classification.folderSuggestion}”无法转换为安全的新建计划，请手动选择目录。`}
+                  </small>
+                )}
+              </div>
             )
           ) : null}
           <button
