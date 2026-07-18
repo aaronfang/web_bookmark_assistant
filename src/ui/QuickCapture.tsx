@@ -142,6 +142,32 @@ export function QuickCapture() {
     }
   };
 
+  const generateSummary = async (): Promise<void> => {
+    const provider = createConfiguredAiProvider();
+    if (!provider) {
+      setStatus('AI 当前已禁用，请先在管理页的 AI 设置中启用 Provider。');
+      return;
+    }
+    setAiBusy(true);
+    try {
+      const result = await provider.summarize({
+        title,
+        url,
+        selectedText: note,
+      });
+      setNote((current) =>
+        current
+          ? `${current}\n\nAI 摘要：${result.summary}`
+          : `AI 摘要：${result.summary}`,
+      );
+      setStatus('已生成摘要，请确认后保存。');
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'AI 摘要生成失败。');
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
   return (
     <section className="quick-capture" aria-labelledby="quick-capture-title">
       <h2 id="quick-capture-title">保存当前页面</h2>
@@ -201,6 +227,13 @@ export function QuickCapture() {
         onClick={() => void generateSuggestions()}
       >
         {aiBusy ? '生成中…' : '生成 AI 标签建议'}
+      </button>
+      <button
+        type="button"
+        disabled={aiBusy || !title.trim() || !url.trim()}
+        onClick={() => void generateSummary()}
+      >
+        {aiBusy ? '生成中…' : '生成 AI 摘要'}
       </button>
       <label>
         阅读状态
