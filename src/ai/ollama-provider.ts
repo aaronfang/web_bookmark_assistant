@@ -4,6 +4,8 @@ import type {
   ContentInput,
   SummaryResult,
 } from './provider';
+import { cleanSummaryResponse, extractModelJsonObject } from './model-response';
+import { buildChineseSummaryPrompt } from './summary-prompt';
 
 export interface OllamaConfig {
   baseUrl: string;
@@ -16,24 +18,11 @@ interface OllamaResponse {
 }
 
 function promptForSummary(input: ContentInput): string {
-  return `Summarize this bookmark in one concise sentence.\nTitle: ${input.title}\nURL: ${input.url}\nDescription: ${input.description ?? ''}\nSelected text: ${input.selectedText ?? ''}`;
+  return `/no_think\n${buildChineseSummaryPrompt(input)}`;
 }
 
 function promptForClassification(input: ContentInput): string {
-  return `/no_think\nClassify this bookmark. Return only one JSON object without markdown or reasoning, with keys contentType, tags (array), folderSuggestion, confidence (0-1), explanation. Return 1-3 concise tags, prefer the existing tags when relevant, avoid synonyms and generic tags such as website/article/content, and return an empty array if evidence is insufficient.\nExisting tags: ${(input.candidateTags ?? []).join(', ')}\nCurrent folder: ${(input.folderPath ?? []).join(' / ')}\nTitle: ${input.title}\nURL: ${input.url}\nDescription: ${input.description ?? ''}\nSelected text: ${input.selectedText ?? ''}`;
-}
-
-function extractJsonObject(text: string): string {
-  const withoutThinking = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-  const fenced = withoutThinking
-    .match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1]
-    ?.trim();
-  const candidate = fenced ?? withoutThinking;
-  const start = candidate.indexOf('{');
-  const end = candidate.lastIndexOf('}');
-  if (start < 0 || end <= start)
-    throw new Error('Ollama classification response was not valid JSON');
-  return candidate.slice(start, end + 1);
+  return `/no_think\nClassify this bookmark. Return only one JSON object without markdown or reasoning, with keys contentType, tags (array), folderSuggestion, confidence (0-1), explanation. Return 1-3 concise tags, prefer the existing tags when relevant, avoid synonyms and generic tags such as website/article/content, and return an empty array if evidence is insufficient.\nExisting tags: ${(input.candidateTags ?? []).join(', ')}\nCurrent folder: ${(input.folderPath ?? []).join(' / ')}\nTitle: ${input.title}\nURL: ${input.url}\nDescription: ${input.description ?? ''}\nSelected text: ${input.selectedText ?? ''}\nPage excerpt: ${input.contentExcerpt ?? ''}`;
 }
 
 export class OllamaProvider implements AiProvider {
@@ -55,14 +44,18 @@ export class OllamaProvider implements AiProvider {
 
   async summarize(input: ContentInput): Promise<SummaryResult> {
     const text = await this.generate(promptForSummary(input));
-    return { summary: text, confidence: 0.5 };
+    const summary = cleanSummaryResponse(text);
+    if (!summary) {
+      throw new Error('Ollama returned reasoning without a final summary');
+    }
+    return { summary, confidence: 0.5 };
   }
 
   async classify(input: ContentInput): Promise<ClassificationResult> {
     const text = await this.generate(promptForClassification(input), true);
     try {
       const parsed = JSON.parse(
-        extractJsonObject(text),
+        extractModelJsonObject(text),
       ) as Partial<ClassificationResult>;
       return {
         contentType: parsed.contentType ?? 'unknown',

@@ -4,12 +4,19 @@ import { database } from '../db/database';
 import type { ReadingStatus } from '../domain/bookmark';
 import { upsertChromeBookmarkMirror } from '../repositories/chrome-bookmark-repository';
 import { extractActiveTabMetadata } from '../content/page-metadata-client';
+import type { PageMetadata } from '../content/page-metadata';
 import { createConfiguredAiProvider } from '../ai/configured-provider';
 
 interface FolderOption {
   id: string;
   label: string;
 }
+
+const emptyPageMetadata: PageMetadata = {
+  description: '',
+  selectedText: '',
+  contentExcerpt: '',
+};
 
 function folderOptions(
   nodes: readonly chrome.bookmarks.BookmarkTreeNode[],
@@ -42,6 +49,8 @@ export function QuickCapture() {
   const [saving, setSaving] = useState(false);
   const [tabId, setTabId] = useState<number | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
+  const [pageMetadata, setPageMetadata] =
+    useState<PageMetadata>(emptyPageMetadata);
 
   useEffect(() => {
     void Promise.all([
@@ -62,15 +71,23 @@ export function QuickCapture() {
     if (tabId === null) return;
     try {
       const metadata = await extractActiveTabMetadata(tabId);
+      setPageMetadata(metadata);
       const text = [metadata.description, metadata.selectedText]
         .filter(Boolean)
         .join('\n\n');
       if (text)
         setNote((current) => (current ? `${current}\n\n${text}` : text));
+      const parts = [
+        metadata.description ? '页面描述' : '',
+        metadata.selectedText ? '选中文本' : '',
+        metadata.contentExcerpt
+          ? `正文摘录（${metadata.contentExcerpt.length} 字）`
+          : '',
+      ].filter(Boolean);
       setStatus(
-        text
-          ? '已读取页面描述和选中文本。'
-          : '当前页面没有可读取的描述或选中文本。',
+        parts.length > 0
+          ? `已在本地读取：${parts.join('、')}。`
+          : '当前页面没有可读取的文本内容。',
       );
     } catch {
       setStatus('无法读取当前页面内容，请确认页面允许扩展访问。');
@@ -129,7 +146,11 @@ export function QuickCapture() {
       const result = await provider.classify({
         title,
         url,
-        selectedText: note,
+        description: pageMetadata.description,
+        selectedText: [pageMetadata.selectedText, note.trim()]
+          .filter(Boolean)
+          .join('\n\n'),
+        contentExcerpt: pageMetadata.contentExcerpt,
         candidateTags,
         folderPath,
       });
@@ -150,15 +171,27 @@ export function QuickCapture() {
     }
     setAiBusy(true);
     try {
+      let metadata = pageMetadata;
+      if (tabId !== null) {
+        try {
+          metadata = await extractActiveTabMetadata(tabId);
+          setPageMetadata(metadata);
+        } catch {
+          // Restricted browser pages may reject script injection. Existing
+          // metadata, the title and the user's note remain valid inputs.
+        }
+      }
       const result = await provider.summarize({
         title,
         url,
-        selectedText: note,
+        description: metadata.description,
+        selectedText: [metadata.selectedText, note.trim()]
+          .filter(Boolean)
+          .join('\n\n'),
+        contentExcerpt: metadata.contentExcerpt,
       });
       setNote((current) =>
-        current
-          ? `${current}\n\nAI 摘要：${result.summary}`
-          : `AI 摘要：${result.summary}`,
+        current ? `${current}\n\n${result.summary}` : result.summary,
       );
       setStatus('已生成摘要，请确认后保存。');
     } catch (error) {
@@ -219,8 +252,14 @@ export function QuickCapture() {
         onClick={() => void readMetadata()}
         disabled={tabId === null}
       >
-        读取页面描述/选中文本
+        读取页面内容
       </button>
+      {pageMetadata.contentExcerpt ? (
+        <small className="quick-capture__content-status">
+          正文摘录仅保存在当前表单中；只有点击 AI 按钮时才会交给已配置的
+          Provider。
+        </small>
+      ) : null}
       <button
         type="button"
         disabled={aiBusy || !title.trim() || !url.trim()}

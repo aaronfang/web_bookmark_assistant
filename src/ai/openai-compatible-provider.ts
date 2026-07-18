@@ -4,6 +4,8 @@ import type {
   ContentInput,
   SummaryResult,
 } from './provider';
+import { cleanSummaryResponse, extractModelJsonObject } from './model-response';
+import { buildChineseSummaryPrompt } from './summary-prompt';
 
 export interface OpenAiCompatibleConfig {
   baseUrl: string;
@@ -31,18 +33,24 @@ export class OpenAiCompatibleProvider implements AiProvider {
   }
 
   async summarize(input: ContentInput): Promise<SummaryResult> {
-    const response = await this.complete(
-      `Summarize this bookmark in one concise sentence.\nTitle: ${input.title}\nURL: ${input.url}\nDescription: ${input.description ?? ''}\nSelected text: ${input.selectedText ?? ''}`,
-    );
-    return { summary: response, confidence: 0.5 };
+    const response = await this.complete(buildChineseSummaryPrompt(input));
+    const summary = cleanSummaryResponse(response);
+    if (!summary) {
+      throw new Error(
+        'OpenAI-compatible provider returned reasoning without a final summary',
+      );
+    }
+    return { summary, confidence: 0.5 };
   }
 
   async classify(input: ContentInput): Promise<ClassificationResult> {
     const response = await this.complete(
-      `Classify this bookmark as JSON with keys contentType, tags (array), folderSuggestion, confidence (0-1), explanation. Return 1-3 concise tags, prefer existing tags when relevant, avoid synonyms and generic tags, and return an empty array if evidence is insufficient.\nExisting tags: ${(input.candidateTags ?? []).join(', ')}\nCurrent folder: ${(input.folderPath ?? []).join(' / ')}\nTitle: ${input.title}\nURL: ${input.url}\nDescription: ${input.description ?? ''}\nSelected text: ${input.selectedText ?? ''}`,
+      `Classify this bookmark as JSON with keys contentType, tags (array), folderSuggestion, confidence (0-1), explanation. Return 1-3 concise tags, prefer existing tags when relevant, avoid synonyms and generic tags, and return an empty array if evidence is insufficient.\nExisting tags: ${(input.candidateTags ?? []).join(', ')}\nCurrent folder: ${(input.folderPath ?? []).join(' / ')}\nTitle: ${input.title}\nURL: ${input.url}\nDescription: ${input.description ?? ''}\nSelected text: ${input.selectedText ?? ''}\nPage excerpt: ${input.contentExcerpt ?? ''}`,
     );
     try {
-      const parsed = JSON.parse(response) as Partial<ClassificationResult>;
+      const parsed = JSON.parse(
+        extractModelJsonObject(response),
+      ) as Partial<ClassificationResult>;
       return {
         contentType: parsed.contentType ?? 'unknown',
         tags: Array.isArray(parsed.tags)

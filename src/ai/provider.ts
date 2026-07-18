@@ -3,6 +3,7 @@ export interface ContentInput {
   url: string;
   description?: string;
   selectedText?: string;
+  contentExcerpt?: string;
   candidateTags?: string[];
   folderPath?: string[];
 }
